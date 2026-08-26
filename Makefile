@@ -1,6 +1,9 @@
 COMPOSE ?= docker compose
 
-.PHONY: setup up down status logs models account backup firewall verify
+.PHONY: doctor setup up down status logs models account backup firewall verify
+
+doctor:
+	./scripts/check-host.sh
 
 setup:
 	./scripts/setup-source.sh

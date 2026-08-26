@@ -1,3 +1,11 @@
+FROM node:22.22-alpine AS dashboard-build
+
+WORKDIR /dashboard
+COPY dashboard/package.json dashboard/package-lock.json ./
+RUN npm ci
+COPY dashboard/ ./
+RUN npm run build
+
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -5,8 +13,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src
 
 WORKDIR /app
-COPY pyproject.toml README.md ./
-COPY src ./src
+COPY soul-service/pyproject.toml soul-service/README.md ./
+COPY soul-service/src ./src
+COPY --from=dashboard-build /dashboard/dist /app/dashboard
 RUN mkdir /data && chown 65532:65532 /data
 
 USER 65532:65532

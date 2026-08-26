@@ -1,6 +1,6 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.1
+**Document version:** 1.2
 
 **Status:** runnable alpha
 
@@ -35,7 +35,8 @@ The first complete release succeeds when:
 
 In scope: Linux source deployment for localhost or trusted LAN; AzerothCore
 3.3.5a with the required Playerbots fork; about 40 soulful guild bots; in-game
-chat; a local dashboard; local Ollama inference; and manual Vanilla-to-Wrath
+chat; an authenticated LAN administration dashboard; local Ollama inference;
+and manual Vanilla-to-Wrath
 progression.
 
 Not in v1: a public internet realm, cloud inference, direct LLM gameplay
@@ -54,10 +55,16 @@ mod-soulbridge worker queue/outbox client
 Soul Service (Python HTTP service)
     |-- durable inbox and reply outbox
     |-- identity, relationships, memory, retrieval
-    |-- inference scheduler and server-rendered dashboard
+    |-- inference scheduler and authenticated admin API
     |-- SQLite in WAL mode
     |
 Ollama chat and embedding APIs
+
+trusted LAN browser --HTTPS--> nginx gateway --> React assets/admin API
+                                                  |
+                                      internal allowlisted control agent
+                                                  |
+                                  Docker socket + AzerothCore config only
 ```
 
 - **AzerothCore and Playerbots** own combat, movement, questing, inventory,
@@ -66,6 +73,10 @@ Ollama chat and embedding APIs
   no personality or memory policy.
 - **Soul Service** owns profiles, memory, relationships, prompts, inference,
   dashboard behavior, and the durable outbox.
+- **React dashboard** manages non-secret bot, soul, model, and server settings
+  through same-origin administration APIs.
+- **Control Agent** is an internal-only, Docker-privileged allowlist for service
+  state, game-server lifecycle, Playerbot roster queries, and selected configs.
 - **Ollama** performs local generation and embedding behind a replaceable
   adapter and is never called from the game process.
 
@@ -80,6 +91,9 @@ client-data initialization, authserver, and worldserver. Setup clones exact
 upstream revisions into ignored runtime storage and syncs Soulbridge into the
 build context. Preflight refuses placeholders or unexpected source revisions;
 a startup failure tears down only this Compose project.
+Initial bot/player settings from `.env` seed generated AzerothCore configuration
+once. Later dashboard changes edit that persistent configuration and therefore
+survive container recreation and whole-app shutdown.
 
 ## 4. Event and reply flow
 
@@ -116,6 +130,16 @@ Each soul has a seeded canonical profile; recent context; episodic memories with
 participants, provenance, emotional tone, importance, and confidence;
 per-character relationship dimensions; summaries; promises; goals; shared guild
 history; and an edit/delete audit trail.
+
+Every forged companion also has a materialized
+`/data/profiles/<realm>/<CharacterName>/SKILL.md`. The human-facing path uses the
+current unique character name, while the frontmatter and database retain the
+immutable AzerothCore GUID as the identity key. The service owns the canonical
+profile and memory-ledger sections; the owner edits a separate character-skill
+section for history, mannerisms, loyalties, fears, goals, and boundaries. That
+guidance is included in dialogue prompts. SQLite remains authoritative for
+transactional memory indexing, and the document is refreshed after profile or
+memory changes.
 
 Canonical facts cannot be rewritten by generated output. Relationship changes
 are bounded per event. Structured memory extraction may produce no memory for
@@ -159,14 +183,27 @@ same dashboard manifest rather than weakening Playerbots.
 
 ## 8. Dashboard and security
 
-The standard-library HTTP service currently serves a minimal soul editor bound
-to loopback by default. A later full administration UI or explicit LAN mode
-requires a password, secure session cookie, CSRF
-protection, firewall allowlist, rate limits, and non-default bridge secret.
+The React administration UI is exposed only through an HTTPS gateway on the
+configured trusted-LAN address. `make up` creates a self-signed certificate for
+that address. Authentication uses a distinct admin password, 12-hour Secure,
+HttpOnly, SameSite=Strict sessions, CSRF tokens on mutations, two layers of
+login rate limiting, request size limits, security headers, and a LAN firewall
+allowlist. MySQL, Ollama, SOAP, Soul Service, and the control agent are not
+published to the LAN.
 
-The dashboard supports soul seeding/editing/pausing/export, memory inspection
-and correction/deletion, relationships/promises/goals, service health and
-latency, and preview/backup/validation/manual unlock of the next phase.
+The control agent has Docker-socket authority and is therefore treated as a
+host-administration boundary. It accepts only an internal bearer secret and an
+explicit operation allowlist; it exposes no arbitrary command, SQL, filesystem,
+or container API. The browser never receives any infrastructure secret.
+
+The dashboard currently supports Playerbot roster discovery; soul seeding,
+editing, pausing, and per-character SKILL.md authoring; memory
+inspection/deletion; service health and game-server
+lifecycle; realm name, bot population and player-limit settings; global
+dialogue tuning; and Ollama model installation/selection. Export,
+relationships/promises/goals, latency analytics, and progression workflows
+remain future work. Progression controls are deliberately absent until backup
+verification and restore testing are automated.
 
 Bridge requests require a shared-secret signature, timestamp window,
 nonce/replay protection, size limits, and strict schema validation. MariaDB,
@@ -180,6 +217,7 @@ Ollama, and administration ports are never exposed directly to the internet.
 - `GET /v1/outbox` returns unexpired pending replies for a realm consumer.
 - `POST /v1/outbox/{reply_id}/ack` acknowledges delivery.
 - Soul export/import follows `contracts/soul-export.schema.json`.
+- Trusted-LAN administration follows `contracts/admin-openapi.yaml`.
 
 Breaking formats require a new version. Additive optional fields may enter v1
 only when existing consumers remain safe.
@@ -194,7 +232,7 @@ only when existing consumers remain safe.
 | Soul Service core | Alpha | SQLite inbox/outbox and bridge APIs implemented |
 | Memory and relationships | Partial | Recent per-soul dialogue persists; richer model pending |
 | Ollama dialogue | Alpha | `qwen3.5:4b` local chat adapter implemented |
-| Dashboard | Partial | Loopback soul profile editor; admin workflows pending |
+| Dashboard | Alpha | Authenticated HTTPS React control plane and safe admin workflows |
 | Progression integration | Alpha | Initial level-19 phase configured; later unlock workflow pending |
 | Guild acceptance | Not started | Eight-hour, 40-soul soak criteria pass |
 
@@ -219,6 +257,31 @@ ac-db-import ac-client-data-init soul-service`. Revisions were core
 modules and produced worldserver, authserver, dbimport, client-data, and Soul
 Service images successfully. A live database/client login smoke test remains
 pending operator secrets.
+
+Also on 2026-08-26, Docker Engine 29.4 built the React-enabled Soul Service and
+Docker CLI 29.6.1 control-agent images. `./scripts/verify.sh` passed Python admin
+session/CSRF/profile/SKILL.md tests, control-agent safety tests, the React
+19.2.8/Vite 8.2.2 production build, Compose rendering, shell validation, and the
+C++ queue test. An isolated container test ran nginx TLS termination, logged in
+through the admin API, forged `Thorn`, edited its character guidance, verified
+`/data/profiles/azeroth-soulforge/Thorn/SKILL.md`, and confirmed that `/v1`
+bridge routes return 404 through the LAN gateway. An in-app visual browser
+inspection was unavailable in the implementation environment; production asset
+compilation and HTTP/TLS behavior were verified directly.
+
+The repository also seeds `examples/profiles/Thorn/SKILL.md` and provides
+`scripts/validate-skill-inference.py`. The validator creates Thorn under the
+immutable internal identity `(skill-validation, 1842)`, loads the owner-editable
+skill section, submits a signed whisper through the production event endpoint,
+waits on the durable outbox, and requires the selected local Ollama model to
+return the profile-only phrase `silver acorn`. This heavyweight integration
+check is explicit rather than part of normal CI because it requires installed
+model weights. On 2026-08-26 the check passed against the pinned Ollama 0.33.0
+runtime and locally installed `qwen3.5:4b`. Soul Service accepted the event and
+the durable reply began: `A silver acorn, tucked safely under the old stone.`
+Because that keepsake exists only in Thorn's owner-editable skill section, this
+demonstrates that the production inference worker supplied `SKILL.md` context to
+the local model.
 
 ## 12. Architecture decision log
 
@@ -281,3 +344,36 @@ small-model baseline than the earlier Qwen3 choice.
 
 **Consequence:** Model identity remains separate from soul identity and may be
 changed after latency/quality benchmarking.
+
+### 2026-08-26 — Use an authenticated LAN React control plane
+
+**Decision:** Serve a Vite-built React client through an HTTPS gateway with
+password sessions, CSRF defense, rate limiting, and a LAN firewall allowlist.
+
+**Reason:** The realm owner needs to manage bots, souls, models, and routine
+server settings without an SSH session while keeping credentials off the client.
+
+**Consequence:** Browsers must accept or locally trust the generated certificate;
+the dashboard is for a trusted LAN and is not approved for internet exposure.
+
+### 2026-08-26 — Isolate Docker authority behind an allowlist
+
+**Decision:** Put Docker-socket and AzerothCore configuration access in an
+internal control-agent container with no host port and no arbitrary operations.
+
+**Reason:** Server lifecycle and persistent settings require host authority, but
+placing that authority directly in a LAN-facing web service would increase risk.
+
+**Consequence:** The agent remains a sensitive host-administration boundary and
+must stay small, authenticated, internal-only, and explicitly allowlisted.
+
+### 2026-08-26 — Keep models replaceable at runtime
+
+**Decision:** Let authenticated administrators install any valid Ollama model
+tag and select among installed models without changing soul identity.
+
+**Reason:** Host capabilities vary, and larger models may improve dialogue on
+machines with more memory or acceleration.
+
+**Consequence:** The operator owns model licensing, disk, memory, and latency
+tradeoffs; `qwen3.5:4b` remains only the portable default.

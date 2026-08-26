@@ -5,14 +5,17 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$REPO_ROOT"
 
 required=(
-  AGENTS.md README.md LICENSE Makefile compose.yaml .env.example docs/PROJECT.md
+  AGENTS.md README.md LICENSE Makefile compose.yaml .env.example .dockerignore docs/PROJECT.md
   docs/LAN_SETUP.md scripts/setup-source.sh scripts/configure-realm.sh
   scripts/create-account.sh scripts/configure-firewall.sh
-  contracts/openapi.yaml contracts/events.schema.json
+  contracts/openapi.yaml contracts/admin-openapi.yaml contracts/events.schema.json
   contracts/soul-export.schema.json soul-service/pyproject.toml
   soul-service/README.md mod-soulbridge/CMakeLists.txt
   mod-soulbridge/README.md mod-soulbridge/include.sh
-  config/upstreams.lock.yaml
+  control-agent/Dockerfile control-agent/server.py dashboard/package-lock.json
+  dashboard/src/main.jsx config/nginx-soulforge.conf config/upstreams.lock.yaml
+  examples/profiles/README.md examples/profiles/Thorn/SKILL.md
+  scripts/validate-skill-inference.py
 )
 for path in "${required[@]}"; do
   test -f "$path" || { echo "missing required file: $path" >&2; exit 1; }
@@ -32,10 +35,24 @@ openapi = Path("contracts/openapi.yaml").read_text(encoding="utf-8")
 for marker in ("openapi: 3.1.0", "/v1/events:", "/v1/outbox:", "components:"):
     if marker not in openapi:
         raise SystemExit(f"contracts/openapi.yaml: missing {marker!r}")
+
+admin = Path("contracts/admin-openapi.yaml").read_text(encoding="utf-8")
+for marker in ("openapi: 3.1.0", "/session:", "/server/settings:", "/models/pull:", "/skill:"):
+    if marker not in admin:
+        raise SystemExit(f"contracts/admin-openapi.yaml: missing {marker!r}")
 PY
 
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=soul-service/src \
   python3 -m unittest discover -s soul-service/tests -v
+
+PYTHONDONTWRITEBYTECODE=1 \
+  python3 -m unittest discover -s control-agent/tests -v
+
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile \
+  scripts/validate-skill-inference.py
+
+npm --prefix dashboard ci --ignore-scripts
+npm --prefix dashboard run build
 
 docker compose --env-file .env.example -f compose.yaml config --quiet
 

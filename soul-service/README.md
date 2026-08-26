@@ -3,11 +3,13 @@
 The Soul Service owns persistent bot identities, memories, Ollama inference,
 and the durable reply outbox. It is a standard-library Python HTTP service with
 a SQLite WAL database, authenticated bridge requests, nonce replay protection,
-idempotent event ingestion, and a loopback-only profile dashboard.
+idempotent event ingestion, and authenticated administration APIs. A production
+React bundle is served by the service and exposed only through the HTTPS gateway.
 
 Runtime configuration comes from the `SOULFORGE_*` and `OLLAMA_*` environment
 variables in the root `compose.yaml`. The versioned endpoints are documented in
-`contracts/openapi.yaml`; the health endpoint is `GET /health`.
+`contracts/openapi.yaml`; the health endpoint is `GET /health`. Dashboard
+endpoints are described separately in `contracts/admin-openapi.yaml`.
 
 The service describes persistent role-play identity as a "soul," but it never
 claims that the model is conscious or sentient. Ollama output is social text

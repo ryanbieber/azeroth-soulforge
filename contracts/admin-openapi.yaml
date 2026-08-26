@@ -1,0 +1,130 @@
+openapi: 3.1.0
+info:
+  title: Azeroth Soulforge Administration API
+  version: 1.0.0
+  description: |
+    Same-origin API used by the trusted-LAN React control plane. Except for
+    login, requests require the Secure, HttpOnly `soulforge_session` cookie.
+    Mutations also require the session's `X-CSRF-Token` value. This API never
+    returns bridge, control, Docker, database, or game-account credentials.
+servers:
+  - url: https://127.0.0.1:8765/admin/v1
+security:
+  - adminSession: []
+paths:
+  /session:
+    get:
+      summary: Inspect the current authenticated session
+      responses:
+        "200": {description: Authenticated session and CSRF token}
+        "401": {description: Authentication required}
+    post:
+      security: []
+      summary: Create a rate-limited admin session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties: {password: {type: string, minLength: 12, maxLength: 256}}
+      responses:
+        "200": {description: Session created}
+        "401": {description: Invalid credentials}
+        "429": {description: Too many attempts}
+    delete:
+      summary: End the current session
+      responses: {"204": {description: Session ended}}
+  /souls:
+    get:
+      summary: List forged souls
+      responses: {"200": {description: Soul profiles and memory counts}}
+    post:
+      summary: Forge a soul for an immutable realm/GUID identity
+      responses: {"201": {description: Soul forged or already present}}
+  /souls/{realm_id}/{bot_guid}:
+    patch:
+      summary: Edit or pause one soul profile
+      parameters:
+        - {$ref: "#/components/parameters/Realm"}
+        - {$ref: "#/components/parameters/Guid"}
+      responses: {"200": {description: Profile saved}, "404": {description: Unknown soul}}
+  /souls/{realm_id}/{bot_guid}/memories:
+    get:
+      summary: List recent memories for one soul
+      parameters:
+        - {$ref: "#/components/parameters/Realm"}
+        - {$ref: "#/components/parameters/Guid"}
+      responses: {"200": {description: Memories}}
+  /souls/{realm_id}/{bot_guid}/skill:
+    get:
+      summary: Read the owner-editable character SKILL.md section
+      parameters:
+        - {$ref: "#/components/parameters/Realm"}
+        - {$ref: "#/components/parameters/Guid"}
+      responses: {"200": {description: Character skill guidance}}
+    put:
+      summary: Replace the owner-editable character SKILL.md section
+      parameters:
+        - {$ref: "#/components/parameters/Realm"}
+        - {$ref: "#/components/parameters/Guid"}
+      responses: {"200": {description: Character skill saved}}
+  /souls/{realm_id}/{bot_guid}/memories/{memory_id}:
+    delete:
+      summary: Permanently delete an incorrect memory
+      parameters:
+        - {$ref: "#/components/parameters/Realm"}
+        - {$ref: "#/components/parameters/Guid"}
+        - {name: memory_id, in: path, required: true, schema: {type: integer, minimum: 1}}
+      responses: {"204": {description: Memory deleted}, "404": {description: Unknown memory}}
+  /bots:
+    get:
+      summary: List generated random Playerbot characters
+      responses: {"200": {description: Playerbot roster}}
+  /server/status:
+    get:
+      summary: Return allowlisted stack status
+      responses: {"200": {description: Service states}}
+  /server/actions/{action}:
+    post:
+      summary: Start, stop, or restart only the game servers
+      parameters:
+        - name: action
+          in: path
+          required: true
+          schema: {type: string, enum: [start, stop, restart]}
+      responses: {"200": {description: Action completed}}
+  /server/settings:
+    get:
+      summary: Return non-secret adjustable settings
+      responses: {"200": {description: Current settings}}
+    put:
+      summary: Validate and apply non-secret adjustable settings
+      responses: {"200": {description: Settings applied}}
+  /models:
+    get:
+      summary: List locally installed Ollama models
+      responses: {"200": {description: Installed and active models}}
+  /models/pull:
+    post:
+      summary: Install an Ollama model by tag
+      responses: {"200": {description: Model installed}}
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: soulforge_session
+  parameters:
+    Realm:
+      name: realm_id
+      in: path
+      required: true
+      schema: {type: string, pattern: "^[A-Za-z0-9._-]{1,64}$"}
+    Guid:
+      name: bot_guid
+      in: path
+      required: true
+      schema: {type: string, pattern: "^[1-9][0-9]{0,19}$"}

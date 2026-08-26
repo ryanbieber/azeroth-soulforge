@@ -75,6 +75,10 @@ integration run proves compatibility.
   safely delivers acknowledged chat replies back on the world thread.
 - `soul-service` owns personality prompts, memory, relationships, retrieval,
   inference scheduling, dashboard behavior, and the durable outbox.
+- `dashboard` is an authenticated React client and must never receive bridge,
+  control, database, Docker, or game-account secrets.
+- `control-agent` is internal-only and Docker-privileged. Keep its API
+  allowlisted; never add arbitrary shell, SQL, file, or container operations.
 - `contracts` owns shared wire formats; neither component may invent a divergent
   private version.
 - Playerbots remains authoritative for gameplay. The Soul Service may express a

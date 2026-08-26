@@ -3,12 +3,14 @@ import hashlib
 import hmac
 from threading import Thread
 import time
+from pathlib import Path
+import tempfile
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from soulforge.server import build_server
+from soulforge.server import SoulStore, build_server
 
 
 class HealthServerTests(unittest.TestCase):
@@ -51,6 +53,70 @@ class HealthServerTests(unittest.TestCase):
         self.assertEqual(first["status"], "accepted")
         self.assertEqual(second["status"], "duplicate")
 
+    def test_admin_session_requires_password_and_csrf(self) -> None:
+        with self.assertRaises(HTTPError) as raised:
+            self._request("POST", "/admin/v1/session", {"password": "wrong"})
+        self.assertEqual(raised.exception.code, 401)
+
+        payload, headers = self._request(
+            "POST", "/admin/v1/session", {"password": "test-admin-password"}, include_headers=True
+        )
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        csrf = payload["csrf_token"]
+        self.assertIn("Secure", headers["Set-Cookie"])
+        with self.assertRaises(HTTPError) as raised:
+            self._request(
+                "POST", "/admin/v1/souls",
+                {"realm_id": "test", "bot_guid": "2", "name": "Companion"},
+                headers={"Cookie": cookie},
+            )
+        self.assertEqual(raised.exception.code, 403)
+
+        soul, _ = self._request(
+            "POST", "/admin/v1/souls",
+            {"realm_id": "test", "bot_guid": "2", "name": "Companion"},
+            headers={"Cookie": cookie, "X-CSRF-Token": csrf}, include_headers=True,
+        )
+        self.assertEqual(soul["name"], "Companion")
+
+        saved, _ = self._request(
+            "PATCH", "/admin/v1/souls/test/2",
+            {"archetype": "stalwart guardian", "voice": "plainspoken", "values_text": "loyalty", "enabled": False},
+            headers={"Cookie": cookie, "X-CSRF-Token": csrf}, include_headers=True,
+        )
+        self.assertEqual(saved["status"], "saved")
+        souls, _ = self._request(
+            "GET", "/admin/v1/souls", headers={"Cookie": cookie}, include_headers=True
+        )
+        self.assertEqual(souls["souls"][0]["enabled"], 0)
+        self.assertEqual(souls["souls"][0]["archetype"], "stalwart guardian")
+
+        skill, _ = self._request(
+            "GET", "/admin/v1/souls/test/2/skill", headers={"Cookie": cookie}, include_headers=True
+        )
+        self.assertIn("Roleplay guidance", skill["document"])
+        self._request(
+            "PUT", "/admin/v1/souls/test/2/skill",
+            {"document": "## History\n\nCompanion once guarded the gates of Ironforge."},
+            headers={"Cookie": cookie, "X-CSRF-Token": csrf}, include_headers=True,
+        )
+        updated, _ = self._request(
+            "GET", "/admin/v1/souls/test/2/skill", headers={"Cookie": cookie}, include_headers=True
+        )
+        self.assertIn("Ironforge", updated["document"])
+
+    def test_skill_file_uses_character_name_but_preserves_internal_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SoulStore(str(Path(directory) / "soulforge.sqlite3"))
+            store.seed_soul("test-realm", "1842", "Thorn")
+            store.update_skill_document("test-realm", "1842", "## History\n\nThorn remembers the old road.")
+            skill_path = Path(directory) / "profiles" / "test-realm" / "Thorn" / "SKILL.md"
+            self.assertTrue(skill_path.is_file())
+            text = skill_path.read_text(encoding="utf-8")
+            self.assertIn("character_guid: 1842", text)
+            self.assertIn("Thorn remembers the old road", text)
+            self.assertFalse((Path(directory) / "profiles" / "test-realm" / "1842").exists())
+
     def _post_event(self, event: dict[str, object]) -> dict[str, str]:
         body = json.dumps(event, separators=(",", ":")).encode()
         timestamp = str(int(time.time()))
@@ -64,6 +130,17 @@ class HealthServerTests(unittest.TestCase):
         )
         with urlopen(request, timeout=2) as response:
             return json.load(response)
+
+    def _request(self, method: str, path: str, payload: dict[str, object] | None = None,
+                 headers: dict[str, str] | None = None, include_headers: bool = False):
+        body = json.dumps(payload).encode() if payload is not None else None
+        request = Request(
+            f"{self.base_url}{path}", data=body, method=method,
+            headers={"Content-Type": "application/json", **(headers or {})},
+        )
+        with urlopen(request, timeout=2) as response:
+            result = json.load(response) if response.status != 204 else None
+            return (result, response.headers) if include_headers else result
 
 
 if __name__ == "__main__":

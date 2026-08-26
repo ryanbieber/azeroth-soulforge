@@ -1,0 +1,11 @@
+.git
+.env
+.run
+backups
+dashboard/node_modules
+dashboard/dist
+runtime
+models
+ollama
+**/__pycache__
+**/*.pyc
