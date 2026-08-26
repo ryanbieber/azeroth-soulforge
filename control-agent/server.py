@@ -21,6 +21,12 @@ SETTING_KEYS = {
     "max_added_bots": ("modules/playerbots.conf", ("AiPlayerbot.MaxAddedBots",), 1, 80),
     "player_limit": ("worldserver.conf", ("PlayerLimit",), 1, 1000),
 }
+REALM_TYPES = {
+    "normal": 0,
+    "pvp": 1,
+    "rp": 6,
+    "rp_pvp": 8,
+}
 
 
 def run(command: list[str], *, input_text: str | None = None, timeout: int = 45) -> str:
@@ -128,6 +134,19 @@ def update_realm_name(value: str) -> None:
     mysql(f"UPDATE realmlist SET name='{escaped}' WHERE id=1;", "acore_auth")
 
 
+def realm_type() -> str:
+    value = read_config_value("worldserver.conf", "GameType", 0)
+    return next((name for name, number in REALM_TYPES.items() if number == value), "normal")
+
+
+def update_realm_type(value: str) -> None:
+    if value not in REALM_TYPES:
+        raise ValueError(f"realm_type must be one of: {', '.join(REALM_TYPES)}")
+    number = REALM_TYPES[value]
+    write_config_value("worldserver.conf", "GameType", number)
+    mysql(f"UPDATE realmlist SET icon={number} WHERE id=1;", "acore_auth")
+
+
 def list_bots() -> list[dict[str, Any]]:
     query = """
 SELECT c.guid,c.name,c.level,c.race,c.class,c.online,a.username
@@ -173,7 +192,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             )]
             self._json(HTTPStatus.OK, {"services": services})
         elif self.path == "/v1/settings":
-            settings: dict[str, Any] = {"realm_name": realm_name()}
+            settings: dict[str, Any] = {"realm_name": realm_name(), "realm_type": realm_type()}
             for name, (filename, keys, minimum, _) in SETTING_KEYS.items():
                 settings[name] = read_config_value(filename, keys[0], minimum)
             self._json(HTTPStatus.OK, settings)
@@ -208,6 +227,9 @@ class ControlHandler(BaseHTTPRequestHandler):
                     changed = True
                 if "realm_name" in payload:
                     update_realm_name(str(payload["realm_name"]).strip())
+                if "realm_type" in payload:
+                    update_realm_type(str(payload["realm_type"]))
+                    changed = True
                 restarted = False
                 if changed:
                     world = service_state("ac-worldserver")

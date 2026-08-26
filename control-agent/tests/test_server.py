@@ -2,6 +2,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SPEC = spec_from_file_location("soulforge_control", Path(__file__).parents[1] / "server.py")
@@ -30,6 +31,25 @@ class ControlSettingsTests(unittest.TestCase):
     def test_realm_name_rejects_sql_metacharacters(self) -> None:
         with self.assertRaises(ValueError):
             control.update_realm_name("Realm'; DROP TABLE realmlist; --")
+
+    def test_realm_type_updates_gameplay_and_realm_list(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            original = control.CONFIG_DIR
+            control.CONFIG_DIR = Path(directory)
+            try:
+                path = control.CONFIG_DIR / "worldserver.conf"
+                path.write_text("GameType = 0\n", encoding="utf-8")
+                with patch.object(control, "mysql") as mysql:
+                    control.update_realm_type("pvp")
+                self.assertEqual(control.realm_type(), "pvp")
+                self.assertIn("GameType = 1", path.read_text(encoding="utf-8"))
+                mysql.assert_called_once_with("UPDATE realmlist SET icon=1 WHERE id=1;", "acore_auth")
+            finally:
+                control.CONFIG_DIR = original
+
+    def test_realm_type_rejects_unknown_values(self) -> None:
+        with self.assertRaisesRegex(ValueError, "realm_type must be one of"):
+            control.update_realm_type("ffa")
 
 
 if __name__ == "__main__":

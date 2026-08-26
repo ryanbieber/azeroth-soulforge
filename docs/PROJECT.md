@@ -1,6 +1,6 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.3
+**Document version:** 1.4
 
 **Status:** runnable alpha
 
@@ -213,7 +213,7 @@ or container API. The browser never receives any infrastructure secret.
 The dashboard currently supports Playerbot roster discovery; soul seeding,
 editing, pausing, and per-character SKILL.md authoring; memory
 inspection/deletion; service health and game-server
-lifecycle; realm name, bot population and player-limit settings; global
+lifecycle; realm name and type, bot population and player-limit settings; global
 dialogue tuning; and Ollama model installation/selection. Export,
 relationships/promises/goals, latency analytics, and progression workflows
 remain future work. Progression controls are deliberately absent until backup
@@ -408,3 +408,15 @@ and a dependency-free site avoids a second package toolchain and supply chain.
 
 **Consequence:** Operator-facing behavior changes must update the README, the
 Markdown getting-started guide, and the Pages site together.
+
+### 2026-08-26 — Keep realm type administrator-selectable
+
+**Decision:** Expose Normal, PvP, RP, and RP-PvP as a validated dashboard
+setting, updating both AzerothCore's gameplay configuration and the realm-list
+icon before restarting the worldserver.
+
+**Reason:** Realm owners should be able to choose their ruleset without editing
+configuration files or issuing database commands on the host.
+
+**Consequence:** Free-for-all PvP and arbitrary numeric realm types remain
+outside the control-agent allowlist.

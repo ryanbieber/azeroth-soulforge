@@ -99,9 +99,19 @@ paths:
   /server/settings:
     get:
       summary: Return non-secret adjustable settings
-      responses: {"200": {description: Current settings}}
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ServerSettings"}
     put:
       summary: Validate and apply non-secret adjustable settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ServerSettingsUpdate"}
       responses: {"200": {description: Settings applied}}
   /models:
     get:
@@ -112,6 +122,25 @@ paths:
       summary: Install an Ollama model by tag
       responses: {"200": {description: Model installed}}
 components:
+  schemas:
+    ServerSettingsUpdate:
+      type: object
+      properties:
+        realm_name: {type: string, minLength: 1, maxLength: 32}
+        realm_type: {type: string, enum: [normal, pvp, rp, rp_pvp]}
+        random_bots: {type: integer, minimum: 0, maximum: 200}
+        max_added_bots: {type: integer, minimum: 1, maximum: 80}
+        player_limit: {type: integer, minimum: 1, maximum: 1000}
+        chat_model: {type: string}
+        souls_enabled: {type: boolean}
+        temperature: {type: number, minimum: 0, maximum: 2}
+        max_tokens: {type: integer, minimum: 32, maximum: 512}
+      additionalProperties: false
+    ServerSettings:
+      allOf:
+        - {$ref: "#/components/schemas/ServerSettingsUpdate"}
+        - type: object
+          required: [realm_name, realm_type, random_bots, max_added_bots, player_limit, chat_model, souls_enabled, temperature, max_tokens]
   securitySchemes:
     adminSession:
       type: apiKey

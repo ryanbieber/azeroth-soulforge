@@ -98,8 +98,9 @@ The browser warning is expected because Soulforge generates a self-signed
 certificate for the private LAN address. Verify the address before accepting
 it, then sign in using `SOULFORGE_ADMIN_PASSWORD`.
 
-The dashboard manages game-service lifecycle, realm and bot population
-settings, soul profiles, memories, character `SKILL.md` guidance, and installed
+The dashboard manages game-service lifecycle, realm name and
+Normal/PvP/RP/RP-PvP type, bot population settings, soul profiles, memories,
+character `SKILL.md` guidance, and installed
 Ollama models. Do not publish this dashboard through a router or public tunnel.
 
 ## 6. Connect a WoW client
