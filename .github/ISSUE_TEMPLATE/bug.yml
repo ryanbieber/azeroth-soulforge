@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible defect without private realm data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach credentials, database dumps, private conversations, or game assets.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest safe sequence that reproduces the problem.
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Soulforge revision
+      placeholder: Git commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, compiler, database, Ollama, and sanitized upstream revisions.
+    validations:
+      required: true

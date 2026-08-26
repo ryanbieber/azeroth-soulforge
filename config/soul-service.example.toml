@@ -1,0 +1,24 @@
+[server]
+host = "127.0.0.1"
+port = 8765
+lan_mode = false
+
+[storage]
+database_path = "./var/soulforge.sqlite3"
+
+[bridge]
+shared_secret_env = "SOULFORGE_BRIDGE_SECRET"
+max_request_bytes = 65536
+signature_window_seconds = 30
+
+[ollama]
+base_url = "http://127.0.0.1:11434"
+chat_model = "qwen3:4b"
+fallback_chat_model = "qwen3:1.7b"
+embedding_model = "embeddinggemma:300m-qat-q4_0"
+generation_workers = 1
+request_timeout_seconds = 45
+
+[dialogue]
+maximum_generated_hops = 1
+reply_ttl_seconds = 60

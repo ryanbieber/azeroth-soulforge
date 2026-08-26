@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azeroth-soulforge.example/schemas/events-v1.json",
+  "title": "Soulforge Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "event_id", "realm_id", "event_type",
+    "occurred_at", "actor", "participants", "trace"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "event_id": {"type": "string", "format": "uuid"},
+    "realm_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$"},
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "chat.say", "chat.whisper", "chat.party", "chat.raid", "chat.guild",
+        "group.join", "group.leave", "guild.join", "guild.leave",
+        "quest.complete", "character.death", "character.resurrect",
+        "trade.complete", "loot.notable", "dungeon.complete", "boss.kill",
+        "progression.unlock"
+      ]
+    },
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "actor": {"$ref": "#/$defs/character"},
+    "participants": {
+      "type": "array",
+      "maxItems": 40,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/character"}
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["say", "whisper", "party", "raid", "guild", "system"]
+    },
+    "text": {"type": "string", "maxLength": 1024},
+    "context": {
+      "type": "object",
+      "maxProperties": 32,
+      "additionalProperties": {
+        "type": ["string", "number", "integer", "boolean", "null"]
+      }
+    },
+    "trace": {"$ref": "#/$defs/trace"}
+  },
+  "$defs": {
+    "character": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["guid", "kind"],
+      "properties": {
+        "guid": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+        "kind": {"type": "string", "enum": ["human", "soul", "playerbot"]},
+        "name": {"type": "string", "minLength": 1, "maxLength": 24}
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trace_id", "origin", "hop_count"],
+      "properties": {
+        "trace_id": {"type": "string", "format": "uuid"},
+        "origin": {"type": "string", "enum": ["human", "generated", "system"]},
+        "hop_count": {"type": "integer", "minimum": 0, "maximum": 1}
+      }
+    }
+  }
+}

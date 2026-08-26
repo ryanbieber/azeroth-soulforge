@@ -1,0 +1,11 @@
+# Copy to the AzerothCore module configuration directory as soulbridge.conf.
+# Never commit the real shared secret.
+
+SoulBridge.Enabled = 0
+SoulBridge.ServiceUrl = "http://127.0.0.1:8765"
+SoulBridge.RealmId = "local-realm"
+SoulBridge.ConsumerId = "worldserver-1"
+SoulBridge.SharedSecretEnv = "SOULFORGE_BRIDGE_SECRET"
+SoulBridge.QueueCapacity = 2048
+SoulBridge.PollIntervalMs = 500
+SoulBridge.RequestTimeoutMs = 2000

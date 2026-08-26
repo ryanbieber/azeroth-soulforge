@@ -1,0 +1,59 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local.toml
+*.pem
+*.key
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+dist/
+*.egg-info/
+
+# C/C++ and AzerothCore output
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+*.o
+*.so
+*.a
+
+# Runtime and private data
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.log
+logs/
+backups/
+transcripts/
+soul-exports/
+ollama/
+models/
+*.gguf
+
+# Proprietary game/server data
+Data/
+dbc/
+maps/
+vmaps/
+mmaps/
+gt/
+updates/
+database-dumps/
+*.sql.gz
+*.mpq
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

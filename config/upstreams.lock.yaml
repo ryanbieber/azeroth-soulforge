@@ -1,0 +1,21 @@
+schema_version: 1
+last_reviewed: "2026-08-25"
+upstreams:
+  - name: playerbots-azerothcore
+    url: https://github.com/mod-playerbots/azerothcore-wotlk.git
+    branch: Playerbot
+    commit: null
+    verification_status: untested
+  - name: mod-playerbots
+    url: https://github.com/mod-playerbots/mod-playerbots.git
+    branch: master
+    commit: null
+    verification_status: untested
+  - name: mod-progression-system
+    url: https://github.com/azerothcore/mod-progression-system.git
+    branch: main
+    commit: null
+    verification_status: untested
+
+# Populate immutable commit hashes during the compatibility spike. Do not mark a
+# revision tested until docs/PROJECT.md contains reproducible evidence.

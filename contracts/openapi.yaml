@@ -1,0 +1,130 @@
+openapi: 3.1.0
+info:
+  title: Azeroth Soulforge Bridge API
+  version: 1.0.0
+  description: Versioned asynchronous boundary between mod-soulbridge and the Soul Service.
+servers:
+  - url: http://127.0.0.1:8765
+security:
+  - bridgeSignature: []
+    bridgeTimestamp: []
+    bridgeNonce: []
+paths:
+  /v1/events:
+    post:
+      operationId: acceptEvent
+      summary: Accept an idempotent game event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./events.schema.json
+      responses:
+        "202":
+          description: Event accepted or previously accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Acceptance"
+        "400": {description: Invalid event}
+        "401": {description: Invalid signature or replay protection metadata}
+        "413": {description: Request too large}
+  /v1/outbox:
+    get:
+      operationId: listReplies
+      summary: List unexpired replies awaiting delivery
+      parameters:
+        - name: realm_id
+          in: query
+          required: true
+          schema: {type: string, pattern: "^[A-Za-z0-9._-]{1,64}$"}
+        - name: consumer_id
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 64}
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        "200":
+          description: Pending replies
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [replies]
+                properties:
+                  replies:
+                    type: array
+                    items: {$ref: "#/components/schemas/Reply"}
+        "401": {description: Invalid signature or replay protection metadata}
+  /v1/outbox/{reply_id}/ack:
+    post:
+      operationId: acknowledgeReply
+      summary: Acknowledge successful in-game delivery
+      parameters:
+        - name: reply_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [consumer_id, delivered_at]
+              properties:
+                consumer_id: {type: string, minLength: 1, maxLength: 64}
+                delivered_at: {type: string, format: date-time}
+      responses:
+        "204": {description: Reply acknowledged or already acknowledged}
+        "401": {description: Invalid signature or replay protection metadata}
+        "404": {description: Unknown reply}
+components:
+  securitySchemes:
+    bridgeSignature:
+      type: apiKey
+      in: header
+      name: X-Soulforge-Signature
+    bridgeTimestamp:
+      type: apiKey
+      in: header
+      name: X-Soulforge-Timestamp
+    bridgeNonce:
+      type: apiKey
+      in: header
+      name: X-Soulforge-Nonce
+  schemas:
+    Acceptance:
+      type: object
+      additionalProperties: false
+      required: [event_id, status]
+      properties:
+        event_id: {type: string, format: uuid}
+        status: {type: string, enum: [accepted, duplicate]}
+    Reply:
+      type: object
+      additionalProperties: false
+      required: [reply_id, source_event_id, realm_id, bot_guid, channel, text, created_at, expires_at, trace]
+      properties:
+        reply_id: {type: string, format: uuid}
+        source_event_id: {type: string, format: uuid}
+        realm_id: {type: string, pattern: "^[A-Za-z0-9._-]{1,64}$"}
+        bot_guid: {type: string, pattern: "^[1-9][0-9]{0,19}$"}
+        recipient_guid: {type: string, pattern: "^[1-9][0-9]{0,19}$"}
+        channel: {type: string, enum: [say, whisper, party, raid, guild]}
+        text: {type: string, minLength: 1, maxLength: 1024}
+        created_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        trace:
+          type: object
+          additionalProperties: false
+          required: [trace_id, origin, hop_count]
+          properties:
+            trace_id: {type: string, format: uuid}
+            origin: {const: generated}
+            hop_count: {type: integer, minimum: 0, maximum: 1}
