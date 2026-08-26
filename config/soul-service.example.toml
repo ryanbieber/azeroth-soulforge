@@ -13,7 +13,7 @@ signature_window_seconds = 30
 
 [ollama]
 base_url = "http://127.0.0.1:11434"
-chat_model = "qwen3:4b"
+chat_model = "qwen3.5:4b"
 fallback_chat_model = "qwen3:1.7b"
 embedding_model = "embeddinggemma:300m-qat-q4_0"
 generation_workers = 1

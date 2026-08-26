@@ -1,0 +1,11 @@
+[worldserver]
+
+SoulBridge.Enabled = 1
+SoulBridge.ServiceHost = "soul-service"
+SoulBridge.ServicePort = 8765
+SoulBridge.RealmId = "azeroth-soulforge"
+SoulBridge.ConsumerId = "worldserver-1"
+SoulBridge.SharedSecret = ""
+SoulBridge.QueueCapacity = 2048
+SoulBridge.PollIntervalMs = 500
+SoulBridge.RequestTimeoutSeconds = 5

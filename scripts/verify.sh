@@ -6,9 +6,13 @@ cd "$REPO_ROOT"
 
 required=(
   AGENTS.md README.md LICENSE Makefile compose.yaml .env.example docs/PROJECT.md
+  docs/LAN_SETUP.md scripts/setup-source.sh scripts/configure-realm.sh
+  scripts/create-account.sh scripts/configure-firewall.sh
   contracts/openapi.yaml contracts/events.schema.json
   contracts/soul-export.schema.json soul-service/pyproject.toml
-  mod-soulbridge/CMakeLists.txt config/upstreams.lock.yaml
+  soul-service/README.md mod-soulbridge/CMakeLists.txt
+  mod-soulbridge/README.md mod-soulbridge/include.sh
+  config/upstreams.lock.yaml
 )
 for path in "${required[@]}"; do
   test -f "$path" || { echo "missing required file: $path" >&2; exit 1; }

@@ -1,13 +1,17 @@
 # Soul Service
 
-The Soul Service will own persistent identities, relationships, memory,
-retrieval, Ollama scheduling, the reply outbox, and the local dashboard.
+The Soul Service owns persistent bot identities, memories, Ollama inference,
+and the durable reply outbox. It is a standard-library Python HTTP service with
+a SQLite WAL database, authenticated bridge requests, nonce replay protection,
+idempotent event ingestion, and a loopback-only profile dashboard.
 
-The initial scaffold implements and tests the idempotent inbox/durable-delivery
-semantics in memory. It is not yet an HTTP server and does not pretend to be a
-production persistence layer. Its container exposes only a development health
-endpoint. Later milestones will replace the repository adapter with SQLite,
-expose the versioned FastAPI contract, and add Ollama inference.
+Runtime configuration comes from the `SOULFORGE_*` and `OLLAMA_*` environment
+variables in the root `compose.yaml`. The versioned endpoints are documented in
+`contracts/openapi.yaml`; the health endpoint is `GET /health`.
+
+The service describes persistent role-play identity as a "soul," but it never
+claims that the model is conscious or sentient. Ollama output is social text
+only and cannot issue gameplay commands.
 
 Run its tests from the repository root with `./scripts/verify.sh` or directly:
 

@@ -1,10 +1,10 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.0
+**Document version:** 1.1
 
-**Status:** scaffold
+**Status:** runnable alpha
 
-**Last reviewed:** 2026-08-25
+**Last reviewed:** 2026-08-26
 
 This document is the durable source of truth for the project. Code, contracts,
 operations, and milestone claims must agree with it.
@@ -51,7 +51,7 @@ AzerothCore worldserver + Playerbots
     | approved events       ^ scheduled chat delivery
 mod-soulbridge worker queue/outbox client
     | authenticated local HTTP
-Soul Service (FastAPI)
+Soul Service (Python HTTP service)
     |-- durable inbox and reply outbox
     |-- identity, relationships, memory, retrieval
     |-- inference scheduler and server-rendered dashboard
@@ -75,13 +75,11 @@ database, model, filesystem, or other blocking operation may occur
 synchronously on the world update thread.
 
 The repository's `make up` and `make down` commands control the complete app.
-MariaDB, Ollama, and the Soul Service run through Docker Compose; the same
-orchestrator starts and safely stops the locally built `authserver` and
-`worldserver` with checked PID files. Preflight refuses a partial runtime, and a
-game-server startup failure tears infrastructure back down. `make dev-up` is the
-explicit infrastructure-only exception used before the compatibility milestone.
-Playerbots remains a native source deployment because its Docker path is not the
-supported v1 baseline.
+Docker Compose builds and runs MySQL, Ollama, the Soul Service, database import,
+client-data initialization, authserver, and worldserver. Setup clones exact
+upstream revisions into ignored runtime storage and syncs Soulbridge into the
+build context. Preflight refuses placeholders or unexpected source revisions;
+a startup failure tears down only this Compose project.
 
 ## 4. Event and reply flow
 
@@ -131,7 +129,7 @@ the versioned soul schema and excludes secrets.
 
 ## 6. Local inference
 
-- Default dialogue model: `qwen3:4b` Q4_K_M.
+- Default dialogue model: `qwen3.5:4b` Q4_K_M.
 - CPU fallback: `qwen3:1.7b` when host benchmarks miss the latency target.
 - Optional later upgrade: a suitable 8B model after benchmarking.
 - Embeddings: `embeddinggemma:300m-qat-q4_0`.
@@ -161,8 +159,9 @@ same dashboard manifest rather than weakening Playerbots.
 
 ## 8. Dashboard and security
 
-FastAPI will serve HTMX-enhanced server-rendered pages and bind to loopback by
-default. Explicit LAN mode requires a password, secure session cookie, CSRF
+The standard-library HTTP service currently serves a minimal soul editor bound
+to loopback by default. A later full administration UI or explicit LAN mode
+requires a password, secure session cookie, CSRF
 protection, firewall allowlist, rate limits, and non-default bridge secret.
 
 The dashboard supports soul seeding/editing/pausing/export, memory inspection
@@ -190,13 +189,13 @@ only when existing consumers remain safe.
 | Milestone | Status | Exit condition |
 | --- | --- | --- |
 | Public repository and contracts | Complete | Public CI-green scaffold |
-| Upstream compatibility spike | Not started | Pinned build and smoke report |
-| Soulbridge transport | Not started | Async integration without world stalls |
-| Soul Service core | Scaffolded | Durable inbox/outbox and validated APIs |
-| Memory and relationships | Not started | Recall, deletion, isolation, restart tests |
-| Ollama dialogue | Not started | In-world replies and host benchmark |
-| Dashboard | Not started | Soul, health, backup, and phase workflows |
-| Progression integration | Not started | Sequential unlock and restore pass |
+| Upstream compatibility spike | Complete | Pinned Docker build passes |
+| Soulbridge transport | Alpha | Async HMAC event/outbox transport builds |
+| Soul Service core | Alpha | SQLite inbox/outbox and bridge APIs implemented |
+| Memory and relationships | Partial | Recent per-soul dialogue persists; richer model pending |
+| Ollama dialogue | Alpha | `qwen3.5:4b` local chat adapter implemented |
+| Dashboard | Partial | Loopback soul profile editor; admin workflows pending |
+| Progression integration | Alpha | Initial level-19 phase configured; later unlock workflow pending |
 | Guild acceptance | Not started | Eight-hour, 40-soul soak criteria pass |
 
 ## 11. Verification
@@ -210,11 +209,16 @@ versions, test baseline, date, and outcome here.
 
 ### Compatibility evidence
 
-No upstream combination has been tested by this repository yet.
-
-The branch heads recorded in `config/upstreams.lock.yaml` were resolved on
-2026-08-25 for reproducibility. Their status remains `untested`; pinning is not
-compatibility evidence.
+On 2026-08-26, Ubuntu 22.04 host/Docker Engine built the official Ubuntu 24.04
+container targets with Clang 18 and C++20. Command:
+`docker compose --env-file .env.example build ac-worldserver ac-authserver
+ac-db-import ac-client-data-init soul-service`. Revisions were core
+`9fb906bb7296212ff42fc95ff73a92aaf8554f0d`, Playerbots
+`2f7d9f774987d0157c6a0d0cc08c40bec3db3945`, and progression
+`84a25e6df8497d83432e61aa38557a92c156e77d`. CMake discovered all three
+modules and produced worldserver, authserver, dbimport, client-data, and Soul
+Service images successfully. A live database/client login smoke test remains
+pending operator secrets.
 
 ## 12. Architecture decision log
 
@@ -255,3 +259,25 @@ authentication, and graceful outage behavior.
 **Reason:** Applied progression SQL can be unsafe to reverse piecemeal.
 
 **Consequence:** v1 has no calendar or boss-triggered automatic unlocks.
+
+### 2026-08-26 — Use one Docker Compose application
+
+**Decision:** Build and operate AzerothCore, Playerbots, progression, Soul
+Service, Ollama, and databases as one named Compose project.
+
+**Reason:** It removes host compiler/database prerequisites and makes `make up`
+and `make down` truthful whole-app controls.
+
+**Consequence:** The initial build/download is large; persistent named volumes
+survive normal shutdown, and unrelated containers are untouched.
+
+### 2026-08-26 — Default dialogue to Qwen3.5 4B
+
+**Decision:** Use Ollama model tag `qwen3.5:4b` as the default local dialogue
+model.
+
+**Reason:** It fits this 30 GiB host comfortably while providing a stronger
+small-model baseline than the earlier Qwen3 choice.
+
+**Consequence:** Model identity remains separate from soul identity and may be
+changed after latency/quality benchmarking.

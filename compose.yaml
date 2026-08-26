@@ -1,65 +1,156 @@
 name: azeroth-soulforge
 
+x-ac-build: &ac-build
+  context: ./runtime/source/azerothcore
+  dockerfile: apps/docker/Dockerfile
+  args:
+    USER_ID: ${SOULFORGE_UID:-1000}
+    GROUP_ID: ${SOULFORGE_GID:-1000}
+    DOCKER_USER: acore
+
+x-ac-databases: &ac-databases
+  AC_LOGIN_DATABASE_INFO: ac-database;3306;root;${SOULFORGE_DB_ROOT_PASSWORD:?set SOULFORGE_DB_ROOT_PASSWORD in .env};acore_auth
+  AC_WORLD_DATABASE_INFO: ac-database;3306;root;${SOULFORGE_DB_ROOT_PASSWORD};acore_world
+  AC_CHARACTER_DATABASE_INFO: ac-database;3306;root;${SOULFORGE_DB_ROOT_PASSWORD};acore_characters
+
 services:
-  mariadb:
-    image: ${MARIADB_IMAGE:-mariadb:11.4}
+  ac-database:
+    image: mysql:8.4
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: ${SOULFORGE_DB_ROOT_PASSWORD:?set SOULFORGE_DB_ROOT_PASSWORD in .env}
-      MARIADB_DATABASE: acore_world
-      MARIADB_USER: ${SOULFORGE_DB_USER:-acore}
-      MARIADB_PASSWORD: ${SOULFORGE_DB_PASSWORD:?set SOULFORGE_DB_PASSWORD in .env}
-    ports:
-      - "127.0.0.1:${MARIADB_PORT:-3306}:3306"
+      MYSQL_ROOT_PASSWORD: ${SOULFORGE_DB_ROOT_PASSWORD}
     volumes:
-      - mariadb-data:/var/lib/mysql
-      - ./runtime/database-init:/docker-entrypoint-initdb.d:ro
+      - ac-database:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "mysql --user=root --password=$$MYSQL_ROOT_PASSWORD --execute 'SELECT 1'"]
       interval: 5s
-      timeout: 5s
-      retries: 20
-    security_opt:
-      - no-new-privileges:true
+      timeout: 10s
+      retries: 40
+    security_opt: [no-new-privileges:true]
+
+  ac-db-import:
+    image: azeroth-soulforge/db-import:local
+    build:
+      <<: *ac-build
+      target: db-import
+    environment:
+      <<: *ac-databases
+      AC_DATA_DIR: /azerothcore/env/dist/data
+      AC_LOGS_DIR: /azerothcore/env/dist/logs
+    volumes:
+      - ./runtime/azerothcore/etc:/azerothcore/env/dist/etc
+      - ./runtime/azerothcore/logs:/azerothcore/env/dist/logs
+    depends_on:
+      ac-database: {condition: service_healthy}
+
+  ac-client-data-init:
+    image: azeroth-soulforge/client-data:local
+    build:
+      <<: *ac-build
+      target: client-data
+    volumes:
+      - ac-client-data:/azerothcore/env/dist/data
+
+  ac-worldserver:
+    image: azeroth-soulforge/worldserver:local
+    build:
+      <<: *ac-build
+      target: worldserver
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    environment:
+      <<: *ac-databases
+      AC_PLAYERBOTS_DATABASE_INFO: ac-database;3306;root;${SOULFORGE_DB_ROOT_PASSWORD};acore_playerbots
+      AC_DATA_DIR: /azerothcore/env/dist/data
+      AC_LOGS_DIR: /azerothcore/env/dist/logs
+      AC_UPDATES_ENABLE_DATABASES: 7
+      AC_MAX_PLAYER_LEVEL: 19
+      AC_PROGRESSION_SYSTEM_BRACKET_0: 1
+      AC_PROGRESSION_SYSTEM_BRACKET_1_19: 1
+      AC_AI_PLAYERBOT_MIN_RANDOM_BOTS: ${SOULFORGE_RANDOM_BOTS:-50}
+      AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: ${SOULFORGE_RANDOM_BOTS:-50}
+      AC_AI_PLAYERBOT_RANDOM_BOT_MAX_LEVEL: 19
+      AC_AI_PLAYERBOT_MAX_ADDED_BOTS: 40
+      AC_SOUL_BRIDGE_ENABLED: 1
+      AC_SOUL_BRIDGE_SERVICE_HOST: soul-service
+      AC_SOUL_BRIDGE_SERVICE_PORT: 8765
+      AC_SOUL_BRIDGE_REALM_ID: azeroth-soulforge
+      AC_SOUL_BRIDGE_SHARED_SECRET: ${SOULFORGE_BRIDGE_SECRET:?set SOULFORGE_BRIDGE_SECRET in .env}
+      AC_SOAP_ENABLED: 1
+      AC_SOAP_IP: 0.0.0.0
+      AC_SOAP_PORT: 7878
+    ports:
+      - "${SOULFORGE_BIND_ADDRESS:-0.0.0.0}:8085:8085"
+      - "127.0.0.1:7878:7878"
+    volumes:
+      - ./runtime/azerothcore/etc:/azerothcore/env/dist/etc
+      - ./runtime/azerothcore/logs:/azerothcore/env/dist/logs
+      - ac-client-data:/azerothcore/env/dist/data:ro
+    depends_on:
+      ac-database: {condition: service_healthy}
+      ac-db-import: {condition: service_completed_successfully}
+      ac-client-data-init: {condition: service_completed_successfully}
+      soul-service: {condition: service_healthy}
+
+  ac-authserver:
+    image: azeroth-soulforge/authserver:local
+    build:
+      <<: *ac-build
+      target: authserver
+    restart: unless-stopped
+    tty: true
+    environment:
+      AC_LOGIN_DATABASE_INFO: ac-database;3306;root;${SOULFORGE_DB_ROOT_PASSWORD};acore_auth
+      AC_LOGS_DIR: /azerothcore/env/dist/logs
+    ports:
+      - "${SOULFORGE_BIND_ADDRESS:-0.0.0.0}:3724:3724"
+    volumes:
+      - ./runtime/azerothcore/etc:/azerothcore/env/dist/etc
+      - ./runtime/azerothcore/logs:/azerothcore/env/dist/logs
+    depends_on:
+      ac-database: {condition: service_healthy}
+      ac-db-import: {condition: service_completed_successfully}
 
   ollama:
-    image: ${OLLAMA_IMAGE:-ollama/ollama:0.11.10}
+    image: ${OLLAMA_IMAGE:-ollama/ollama:0.33.0}
     restart: unless-stopped
     volumes:
       - ollama-data:/root/.ollama
-    ports:
-      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 5s
       timeout: 5s
       retries: 20
-    security_opt:
-      - no-new-privileges:true
+    security_opt: [no-new-privileges:true]
 
   soul-service:
-    build:
-      context: ./soul-service
+    build: ./soul-service
     restart: unless-stopped
     depends_on:
-      - ollama
+      ollama: {condition: service_healthy}
     environment:
       SOULFORGE_HOST: 0.0.0.0
       SOULFORGE_PORT: 8765
+      SOULFORGE_DATABASE: /data/soulforge.sqlite3
       SOULFORGE_OLLAMA_URL: http://ollama:11434
+      SOULFORGE_CHAT_MODEL: ${SOULFORGE_CHAT_MODEL:-qwen3.5:4b}
+      SOULFORGE_BRIDGE_SECRET: ${SOULFORGE_BRIDGE_SECRET}
     ports:
-      - "127.0.0.1:${SOULFORGE_PORT:-8765}:8765"
+      - "127.0.0.1:${SOULFORGE_DASHBOARD_PORT:-8765}:8765"
+    volumes:
+      - soul-data:/data
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=2)"]
       interval: 5s
       timeout: 3s
       retries: 20
     read_only: true
-    tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
 
 volumes:
-  mariadb-data:
+  ac-database:
+  ac-client-data:
   ollama-data:
+  soul-data:

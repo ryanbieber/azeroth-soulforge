@@ -7,6 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
+RUN mkdir /data && chown 65532:65532 /data
 
 USER 65532:65532
 EXPOSE 8765

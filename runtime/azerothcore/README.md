@@ -1,25 +1,9 @@
 # Local AzerothCore runtime
 
-This directory is the ignored local runtime boundary used by `make up`. It must
-be populated from a locally built, pinned Playerbots AzerothCore installation;
-game binaries and extracted data are never committed.
+Docker Compose bind-mounts `etc/` and `logs/` here. The official container
+entrypoint materializes configuration from the compiled `.dist` files and the
+`AC_*` environment settings in `compose.yaml`.
 
-Expected layout:
-
-```text
-runtime/azerothcore/
-  bin/authserver
-  bin/worldserver
-  etc/authserver.conf
-  etc/worldserver.conf
-  etc/modules/playerbots.conf
-  etc/modules/soulbridge.conf
-  data/dbc/
-  data/maps/
-  data/vmaps/
-  data/mmaps/
-```
-
-Configure both server files to use MariaDB at `127.0.0.1` and the port and
-credentials from the root `.env`. Configure `DataDir` for this directory's
-`data` folder. The preflight intentionally refuses to start a partial runtime.
+Server binaries, extracted map data, MySQL data, and model weights live in
+Docker images or named volumes, not this directory. Runtime contents are
+private and ignored; this README is the only committed file in the boundary.

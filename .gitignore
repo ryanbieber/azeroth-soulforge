@@ -53,6 +53,7 @@ database-dumps/
 runtime/azerothcore/bin/
 runtime/azerothcore/etc/
 runtime/azerothcore/data/
+runtime/source/
 runtime/database-init/*.sql
 runtime/database-init/*.sql.gz
 *.sql.gz

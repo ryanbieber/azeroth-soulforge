@@ -2,7 +2,12 @@ openapi: 3.1.0
 info:
   title: Azeroth Soulforge Bridge API
   version: 1.0.0
-  description: Versioned asynchronous boundary between mod-soulbridge and the Soul Service.
+  description: |
+    Versioned asynchronous boundary between mod-soulbridge and the Soul Service.
+    Signatures are lowercase hex HMAC-SHA256 over the exact UTF-8 bytes of
+    `METHOD + "\n" + request-target + "\n" + timestamp + "\n" + nonce + "\n" + body`.
+    The request-target includes its query string. Timestamps are Unix seconds;
+    receivers allow a 30-second window and reject reused nonces.
 servers:
   - url: http://127.0.0.1:8765
 security:

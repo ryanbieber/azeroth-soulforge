@@ -11,7 +11,7 @@ must review the license attached to the exact revision or model tag they use.
 | mod-playerbots | Gameplay bot module | GPL-2.0 |
 | mod-progression-system | Optional phased content | Verify pinned revision |
 | Ollama | Local model runtime | Verify installed release |
-| Qwen3 model | Default dialogue model | Apache-2.0 on referenced Ollama tag |
+| Qwen3.5 model | Default dialogue model | Apache-2.0 on referenced Ollama tag |
 | EmbeddingGemma | Default embedding model | Model-specific Gemma terms |
 
 World of Warcraft and Blizzard Entertainment are trademarks or registered

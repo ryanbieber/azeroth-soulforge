@@ -1,83 +1,76 @@
 # Azeroth Soulforge
 
-Azeroth Soulforge is an open-source foundation for a private AzerothCore realm
-where a player builds a persistent guild of Playerbot companions. AzerothCore
-and Playerbots retain control of gameplay; a local Ollama-backed service gives
-selected companions consistent personalities, relationships, conversation, and
-long-term memory.
+Azeroth Soulforge is a local/private AzerothCore 3.3.5a realm where Playerbot
+companions have persistent simulated identities, personalities, and memories.
+Playerbots owns every gameplay action; a local Ollama service supplies social
+dialogue without blocking the game world thread.
 
-> **Project status:** design and integration scaffold. This repository does not
-> yet provide a runnable game server.
+The word *soul* means a designed simulation of continuity. It is not a claim
+that a bot or language model is conscious or alive.
 
-The word *soul* in this project means a deliberately designed, persistent
-simulation of identity. It is not a claim that an LLM or bot is conscious.
+## What works
 
-## Design goals
+- Pinned Playerbots AzerothCore fork, `mod-playerbots`, and
+  `mod-progression-system`, compiled together in Docker.
+- Level-19 initial progression phase with 50 random bots by default.
+- Asynchronous C++ Soulbridge with HMAC authentication and durable reply flow.
+- SQLite WAL storage for soul profiles, conversation memories, and outbox data.
+- Local dialogue through Ollama and `qwen3.5:4b`.
+- Loopback-only soul dashboard at <http://127.0.0.1:8765>.
+- One-command whole-app lifecycle: `make up` and `make down`.
 
-- A private solo/LAN realm with a curated guild of about 40 companions.
-- Playerbots for combat, movement, questing, gearing, and raids.
-- A local LLM social layer that never blocks AzerothCore's world thread.
-- Durable memories keyed to immutable character GUIDs.
-- Manual, backed-up Vanilla-to-Wrath realm progression.
-- No cloud dependency during normal play.
+## First launch
 
-Read the [durable project specification](docs/PROJECT.md) for the architecture,
-operating rules, milestones, and current decisions. Contributors and coding
-agents must also read [AGENTS.md](AGENTS.md).
-
-## Repository layout
-
-- `mod-soulbridge/` — AzerothCore C++ integration boundary.
-- `soul-service/` — local Python service, memory store, and future dashboard.
-- `contracts/` — versioned wire and export formats.
-- `config/` — safe example configuration and upstream revision records.
-- `scripts/verify.sh` — repository verification entrypoint.
-
-## Quick verification
+Docker and Docker Compose are the only host build dependencies. The first run
+builds AzerothCore, downloads extracted server map data, and downloads the
+3.4 GB model, so it is much slower than later starts.
 
 ```bash
-./scripts/verify.sh
+cp .env.example .env
+# Edit .env and replace every private placeholder.
+make firewall
+make up
 ```
 
-## Start and stop the whole application
+`make firewall` is a one-time LAN firewall step and asks for the Linux password
+locally. `make up` creates or updates the game account from `.env`, imports the
+databases, advertises the realm at the configured LAN address, and starts all
+seven services. It does not affect unrelated Docker applications.
 
-After completing the runtime layout in `runtime/azerothcore/` and creating a
-private `.env` from `.env.example`, one command controls MariaDB, Ollama, the
-Soul Service, AzerothCore authserver, and AzerothCore worldserver:
+To stop everything while retaining databases, souls, maps, and model files:
 
 ```bash
-make up
 make down
 ```
 
-`make up` performs a full preflight, starts containerized infrastructure, then
-starts the locally built Playerbots servers. If either game server fails, it
-stops the infrastructure rather than leaving half the application running.
-`make down` stops the game servers first and then the infrastructure. MariaDB
-and Ollama data remain in named volumes.
+See [LAN launch guide](docs/LAN_SETUP.md) for client configuration and
+troubleshooting. See [durable project specification](docs/PROJECT.md) for
+architecture and decisions. Contributors and coding agents must read
+[AGENTS.md](AGENTS.md).
 
-The project uses native Playerbots server binaries because that is the supported
-deployment baseline. See `runtime/azerothcore/README.md` for the required local
-layout. Until that compatibility/build milestone is completed, `make dev-up`
-starts only MariaDB, Ollama, and the scaffold Soul Service for development.
+Useful commands:
 
-On first use, download the models explicitly with `make models`; downloads are
-not a startup side effect. Use `make status` or `make logs` for infrastructure.
+```bash
+make status    # all container states
+make logs      # follow logs
+make backup    # timestamped full database dump before progression changes
+make account   # recreate/update the account from .env
+make verify    # repository tests and contract checks
+```
 
-The current service exposes only `GET /health`. Versioned bridge endpoints are
-contracted but intentionally return 404 until their implementation milestone.
+## Repository layout
 
-The initial scaffold uses only the Python standard library at runtime and in
-tests. FastAPI, Ollama integration, SQLite persistence, and the AzerothCore
-module are planned milestones rather than mocked production features.
+- `mod-soulbridge/` — asynchronous AzerothCore C++ bridge.
+- `soul-service/` — local dialogue, persistence, and dashboard service.
+- `contracts/` — versioned event, outbox, and export contracts.
+- `config/upstreams.lock.yaml` — exact upstream source revisions.
+- `scripts/` — reproducible setup, lifecycle, backup, account, and LAN tools.
+- `docs/PROJECT.md` — durable source of project truth.
 
 ## Legal and data notice
 
-This project is not affiliated with or endorsed by Blizzard Entertainment.
-World of Warcraft is a trademark of Blizzard Entertainment. This repository
-does not include a game client, maps, DBC files, extracted game data, database
-dumps, model weights, or other proprietary assets. Operators are responsible
-for complying with the laws and license terms that apply to them.
-
-Original project code is licensed under GPL-2.0-only. See [LICENSE](LICENSE) and
+This project is not affiliated with Blizzard Entertainment and does not ship a
+WoW client, Blizzard game files, runtime databases, model weights, or secrets.
+You must supply a legally obtained WoW 3.3.5a client for each playing computer.
+Original project code is GPL-2.0-only; see [LICENSE](LICENSE) and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

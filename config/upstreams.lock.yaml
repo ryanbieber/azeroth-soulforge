@@ -5,17 +5,16 @@ upstreams:
     url: https://github.com/mod-playerbots/azerothcore-wotlk.git
     branch: Playerbot
     commit: 9fb906bb7296212ff42fc95ff73a92aaf8554f0d
-    verification_status: untested
+    verification_status: docker-build-passed-2026-08-26
   - name: mod-playerbots
     url: https://github.com/mod-playerbots/mod-playerbots.git
     branch: master
     commit: 2f7d9f774987d0157c6a0d0cc08c40bec3db3945
-    verification_status: untested
+    verification_status: docker-build-passed-2026-08-26
   - name: mod-progression-system
     url: https://github.com/azerothcore/mod-progression-system.git
     branch: main
     commit: 84a25e6df8497d83432e61aa38557a92c156e77d
-    verification_status: untested
+    verification_status: docker-build-passed-2026-08-26
 
-# Populate immutable commit hashes during the compatibility spike. Do not mark a
-# revision tested until docs/PROJECT.md contains reproducible evidence.
+# Build evidence and remaining live-smoke limitations are in docs/PROJECT.md.
