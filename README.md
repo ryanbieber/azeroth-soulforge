@@ -39,6 +39,34 @@ agents must also read [AGENTS.md](AGENTS.md).
 ./scripts/verify.sh
 ```
 
+## Start and stop the whole application
+
+After completing the runtime layout in `runtime/azerothcore/` and creating a
+private `.env` from `.env.example`, one command controls MariaDB, Ollama, the
+Soul Service, AzerothCore authserver, and AzerothCore worldserver:
+
+```bash
+make up
+make down
+```
+
+`make up` performs a full preflight, starts containerized infrastructure, then
+starts the locally built Playerbots servers. If either game server fails, it
+stops the infrastructure rather than leaving half the application running.
+`make down` stops the game servers first and then the infrastructure. MariaDB
+and Ollama data remain in named volumes.
+
+The project uses native Playerbots server binaries because that is the supported
+deployment baseline. See `runtime/azerothcore/README.md` for the required local
+layout. Until that compatibility/build milestone is completed, `make dev-up`
+starts only MariaDB, Ollama, and the scaffold Soul Service for development.
+
+On first use, download the models explicitly with `make models`; downloads are
+not a startup side effect. Use `make status` or `make logs` for infrastructure.
+
+The current service exposes only `GET /health`. Versioned bridge endpoints are
+contracted but intentionally return 404 until their implementation milestone.
+
 The initial scaffold uses only the Python standard library at runtime and in
 tests. FastAPI, Ollama integration, SQLite persistence, and the AzerothCore
 module are planned milestones rather than mocked production features.

@@ -1,0 +1,55 @@
+name: azeroth-soulforge
+
+services:
+  mariadb:
+    image: ${MARIADB_IMAGE:-mariadb:11.4}
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${SOULFORGE_DB_ROOT_PASSWORD:?set SOULFORGE_DB_ROOT_PASSWORD in .env}
+      MARIADB_DATABASE: acore_world
+      MARIADB_USER: ${SOULFORGE_DB_USER:-acore}
+      MARIADB_PASSWORD: ${SOULFORGE_DB_PASSWORD:?set SOULFORGE_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${MARIADB_PORT:-3306}:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./runtime/database-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+
+  ollama:
+    image: ${OLLAMA_IMAGE:-ollama/ollama:0.11.10}
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    security_opt:
+      - no-new-privileges:true
+
+  soul-service:
+    build:
+      context: ./soul-service
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    environment:
+      SOULFORGE_HOST: 0.0.0.0
+      SOULFORGE_PORT: 8765
+      SOULFORGE_OLLAMA_URL: http://ollama:11434
+    ports:
+      - "127.0.0.1:${SOULFORGE_PORT:-8765}:8765"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  mariadb-data:
+  ollama-data:

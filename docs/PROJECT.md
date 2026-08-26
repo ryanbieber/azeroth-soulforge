@@ -74,6 +74,15 @@ HTTP. Replies return through a world-thread-safe scheduler. No network,
 database, model, filesystem, or other blocking operation may occur
 synchronously on the world update thread.
 
+The repository's `make up` and `make down` commands control the complete app.
+MariaDB, Ollama, and the Soul Service run through Docker Compose; the same
+orchestrator starts and safely stops the locally built `authserver` and
+`worldserver` with checked PID files. Preflight refuses a partial runtime, and a
+game-server startup failure tears infrastructure back down. `make dev-up` is the
+explicit infrastructure-only exception used before the compatibility milestone.
+Playerbots remains a native source deployment because its Docker path is not the
+supported v1 baseline.
+
 ## 4. Event and reply flow
 
 Capture chat involving a soul plus guild/group changes, quest completions,

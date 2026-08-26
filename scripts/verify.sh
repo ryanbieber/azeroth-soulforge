@@ -5,7 +5,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$REPO_ROOT"
 
 required=(
-  AGENTS.md README.md LICENSE docs/PROJECT.md
+  AGENTS.md README.md LICENSE Makefile compose.yaml .env.example docs/PROJECT.md
   contracts/openapi.yaml contracts/events.schema.json
   contracts/soul-export.schema.json soul-service/pyproject.toml
   mod-soulbridge/CMakeLists.txt config/upstreams.lock.yaml
@@ -32,6 +32,12 @@ PY
 
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=soul-service/src \
   python3 -m unittest discover -s soul-service/tests -v
+
+docker compose --env-file .env.example -f compose.yaml config --quiet
+
+for script in scripts/*.sh; do
+  bash -n "$script"
+done
 
 VERIFY_TMP=$(mktemp -d)
 trap 'rm -rf "$VERIFY_TMP"' EXIT

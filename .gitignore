@@ -27,6 +27,7 @@ CMakeCache.txt
 *.a
 
 # Runtime and private data
+.run/
 *.db
 *.db-*
 *.sqlite
@@ -49,6 +50,11 @@ mmaps/
 gt/
 updates/
 database-dumps/
+runtime/azerothcore/bin/
+runtime/azerothcore/etc/
+runtime/azerothcore/data/
+runtime/database-init/*.sql
+runtime/database-init/*.sql.gz
 *.sql.gz
 *.mpq
 
