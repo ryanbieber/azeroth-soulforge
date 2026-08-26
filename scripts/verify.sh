@@ -16,6 +16,9 @@ required=(
   dashboard/src/main.jsx config/nginx-soulforge.conf config/upstreams.lock.yaml
   examples/profiles/README.md examples/profiles/Thorn/SKILL.md
   scripts/validate-skill-inference.py
+  docs/GETTING_STARTED.md site/index.html site/assets/styles.css
+  site/assets/app.js site/.nojekyll .github/workflows/pages.yml
+  scripts/validate-pages.py
 )
 for path in "${required[@]}"; do
   test -f "$path" || { echo "missing required file: $path" >&2; exit 1; }
@@ -50,6 +53,8 @@ PYTHONDONTWRITEBYTECODE=1 \
 
 PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile \
   scripts/validate-skill-inference.py
+
+python3 scripts/validate-pages.py
 
 npm --prefix dashboard ci --ignore-scripts
 npm --prefix dashboard run build

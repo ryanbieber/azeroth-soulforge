@@ -1,106 +1,117 @@
 # Azeroth Soulforge
 
-Azeroth Soulforge is a local/private AzerothCore 3.3.5a realm where Playerbot
-companions have persistent simulated identities, personalities, and memories.
-Playerbots owns every gameplay action; a local Ollama service supplies social
-dialogue without blocking the game world thread.
+Azeroth Soulforge is a self-hosted AzerothCore 3.3.5a realm with Playerbots,
+staged progression, persistent companion profiles and memories, and local
+dialogue through Ollama. A password-protected React dashboard manages bots,
+souls, models, and routine server settings from your trusted home network.
 
-The word *soul* means a designed simulation of continuity. It is not a claim
-that a bot or language model is conscious or alive.
+> A Soulforge “soul” is a simulation of character continuity. It is not a claim
+> that a bot or language model is conscious or alive.
 
-## What works
+**[Open the illustrated setup guide](https://ryanbieber.github.io/azeroth-soulforge/)** ·
+**[Detailed LAN instructions](docs/GETTING_STARTED.md)** ·
+**[Report a problem](https://github.com/ryanbieber/azeroth-soulforge/issues)**
 
-- Pinned Playerbots AzerothCore fork, `mod-playerbots`, and
-  `mod-progression-system`, compiled together in Docker.
-- Level-19 initial progression phase with 50 random bots by default.
-- Asynchronous C++ Soulbridge with HMAC authentication and durable reply flow.
-- SQLite WAL storage for soul profiles, conversation memories, and outbox data.
-- Local dialogue through Ollama, defaulting to `qwen3.5:4b` with runtime model
-  installation and selection for more powerful hosts.
-- Password-protected React control plane over HTTPS on the trusted LAN.
-- Bot roster, soul profiles, memory correction, server health/lifecycle, realm
-  name, population, player-limit, and inference settings in one UI.
-- A name-based `SKILL.md` for every companion, combining owner-written character
-  depth with a service-managed canonical profile and memory ledger.
-- One-command whole-app lifecycle: `make up` and `make down`.
+## What you need
 
-## First launch
+- A Linux x86_64 or ARM64 computer on your home network.
+- Docker Engine with the Compose v2 plugin, Git, Make, OpenSSL, curl, Python
+  3.8+, and the Linux `ip` command.
+- At least 6 GiB RAM and 15 GiB free disk; more is recommended for larger
+  Ollama models.
+- A legally obtained World of Warcraft 3.3.5a build 12340 client for every
+  player. The repository does not provide Blizzard software or game data.
+- A stable LAN address for the server. Router port-forwarding is neither needed
+  nor recommended.
 
-`make up` checks the small host dependency set before changing anything: Linux,
-Git, Make, OpenSSL, curl, Python 3.8+, `ip`, Docker Engine, Compose v2, RAM, and free disk.
-All compilers and application libraries run inside containers. The first run
-builds AzerothCore, downloads extracted server map data, and downloads the
-3.4 GB model, so it is much slower than later starts.
+`make doctor` checks the host before the stack changes anything. Compilers,
+MariaDB, AzerothCore, Ollama, and application libraries run in containers.
+
+## Start your server
 
 ```bash
+git clone https://github.com/ryanbieber/azeroth-soulforge.git
+cd azeroth-soulforge
 cp .env.example .env
-# Edit .env and replace every private placeholder.
+```
+
+Open `.env` and replace every placeholder. Set `SOULFORGE_LAN_IP` to this
+computer’s stable Wi-Fi/Ethernet address, `SOULFORGE_BIND_ADDRESS` to the same
+address, and `SOULFORGE_LAN_CIDR` to the trusted subnet. You can inspect local
+addresses with `ip -brief address`.
+
+Then run:
+
+```bash
+make doctor
 make firewall
 make up
 ```
 
-`make firewall` is a one-time LAN firewall step and asks for the Linux password
-locally. `make up` creates or updates the game account from `.env`, generates a
-private HTTPS certificate, imports the databases, advertises the realm at the
-configured LAN address, and starts the complete stack. It does not affect
-unrelated Docker applications.
+The first launch is slow: it builds AzerothCore, initializes databases and map
+data, and downloads the default 3.4 GB `qwen3.5:4b` model. Wait for
+`Azeroth Soulforge is ready`.
 
-Open `https://YOUR_LAN_IP:8765` from a device on the configured LAN. The first
-visit shows a warning because the certificate is locally generated; verify the
-displayed IP before accepting it. Sign in with `SOULFORGE_ADMIN_PASSWORD`.
+Open `https://YOUR_LAN_IP:8765`, accept the expected self-signed certificate for
+your private server, and sign in with `SOULFORGE_ADMIN_PASSWORD`.
 
-To stop everything while retaining databases, souls, maps, and model files:
+On each WoW client, edit the locale-specific `realmlist.wtf`—for example
+`Data/enUS/realmlist.wtf`—to contain:
 
-```bash
-make down
+```text
+set realmlist YOUR_LAN_IP
 ```
 
-See [LAN launch guide](docs/LAN_SETUP.md) for client configuration and
-troubleshooting. See [durable project specification](docs/PROJECT.md) for
-architecture and decisions. Contributors and coding agents must read
-[AGENTS.md](AGENTS.md).
+Start `Wow.exe` directly and use `SOULFORGE_GAME_USERNAME` and
+`SOULFORGE_GAME_PASSWORD` from your private `.env`.
 
-Useful commands:
+## Everyday commands
 
 ```bash
-make status    # all container states
-make doctor    # host dependency and capacity check
+make up        # check the host and start the complete application
+make down      # stop it while retaining databases, souls, maps, and models
+make status    # show all Soulforge containers
 make logs      # follow logs
-make backup    # timestamped full database dump before progression changes
-make account   # recreate/update the account from .env
-make verify    # repository tests and contract checks
+make backup    # dump all databases before progression changes
+make account   # recreate or update the configured game account
+make verify    # run repository tests and contract checks
 ```
 
-The repository includes a seeded companion example at
-`examples/profiles/Thorn/SKILL.md`. With Ollama running and `qwen3.5:4b`
-installed, this command sends a signed whisper through the real Soul Service
-worker and fails unless the model recalls Thorn's profile-only keepsake:
+The dashboard can start, stop, and restart the game services; configure realm
+and Playerbot population settings; forge character profiles; edit each
+character’s `SKILL.md`; inspect or remove memories; and install or select any
+Ollama model the host can support. Playerbots remains responsible for every
+gameplay action—the language model is only a social layer.
 
-```bash
-./scripts/validate-skill-inference.py
-```
+## Important safety notes
 
-This model-backed check is intentionally separate from `make verify` so routine
-CI does not download model weights. Souls created in the dashboard get their
-own live file at `/data/profiles/REALM/CharacterName/SKILL.md` inside Soul
-Service; edit them through the dashboard so SQLite and the materialized file
-remain synchronized.
+- This is a trusted-LAN/private-server design, not an internet deployment.
+- Never commit `.env`; it and runtime credentials are ignored by Git.
+- Do not expose MySQL, Ollama, Soul Service, or the internal control agent.
+- Back up before changing progression. Do not improvise downgrade SQL; restore
+  the complete pre-change backup after a failed unlock.
+- Normal `make down` keeps named Docker volumes. Removing volumes deletes realm
+  and soul data.
 
-## Repository layout
+For the complete walkthrough, troubleshooting, IP-change procedure, and first
+soul instructions, read [Getting Started](docs/GETTING_STARTED.md).
 
-- `mod-soulbridge/` — asynchronous AzerothCore C++ bridge.
-- `soul-service/` — local dialogue, persistence, and dashboard service.
-- `dashboard/` — React administration client built into Soul Service.
-- `control-agent/` — internal allowlisted game/container control boundary.
-- `contracts/` — versioned event, outbox, and export contracts.
-- `config/upstreams.lock.yaml` — exact upstream source revisions.
-- `scripts/` — reproducible setup, lifecycle, backup, account, and LAN tools.
-- `docs/PROJECT.md` — durable source of project truth.
+## Repository map
 
-## Legal and data notice
+- `dashboard/` — React administration client.
+- `soul-service/` — authenticated APIs, local inference, memory, and profiles.
+- `mod-soulbridge/` — asynchronous AzerothCore event/reply bridge.
+- `control-agent/` — internal allowlisted lifecycle/configuration boundary.
+- `contracts/` — versioned public wire formats.
+- `site/` — static GitHub Pages documentation.
+- `docs/PROJECT.md` — durable architecture and project decisions.
+- `examples/profiles/Thorn/SKILL.md` — fictional companion profile example.
 
-This project is not affiliated with Blizzard Entertainment and does not ship a
-WoW client, Blizzard game files, runtime databases, model weights, or secrets.
-You must supply a legally obtained WoW 3.3.5a client for each playing computer.
-Original project code is GPL-2.0-only; see [LICENSE](LICENSE) and
+## Legal and project status
+
+This project is not affiliated with Blizzard Entertainment. It does not ship a
+WoW client, Blizzard game files, extracted assets, runtime databases, model
+weights, or secrets. The stack is a runnable alpha; later progression unlocks
+and long-duration guild soak testing are still in progress. Original project
+code is GPL-2.0-only; see [LICENSE](LICENSE) and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

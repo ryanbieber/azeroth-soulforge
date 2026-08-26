@@ -1,6 +1,6 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.2
+**Document version:** 1.3
 
 **Status:** runnable alpha
 
@@ -209,6 +209,11 @@ Bridge requests require a shared-secret signature, timestamp window,
 nonce/replay protection, size limits, and strict schema validation. MariaDB,
 Ollama, and administration ports are never exposed directly to the internet.
 
+Public operator documentation is a dependency-free static site in `site/`,
+deployed from `main` through the least-privilege GitHub Pages workflow. The
+public site contains no runtime state, game assets, secrets, or dashboard
+authority and is operationally separate from the private LAN control plane.
+
 ## 9. Public APIs
 
 `contracts/openapi.yaml` is authoritative:
@@ -233,6 +238,7 @@ only when existing consumers remain safe.
 | Memory and relationships | Partial | Recent per-soul dialogue persists; richer model pending |
 | Ollama dialogue | Alpha | `qwen3.5:4b` local chat adapter implemented |
 | Dashboard | Alpha | Authenticated HTTPS React control plane and safe admin workflows |
+| Public setup documentation | Complete | Beginner guide deploys through GitHub Pages |
 | Progression integration | Alpha | Initial level-19 phase configured; later unlock workflow pending |
 | Guild acceptance | Not started | Eight-hour, 40-soul soak criteria pass |
 
@@ -377,3 +383,14 @@ machines with more memory or acceleration.
 
 **Consequence:** The operator owns model licensing, disk, memory, and latency
 tradeoffs; `qwen3.5:4b` remains only the portable default.
+
+### 2026-08-26 — Publish dependency-free operator documentation
+
+**Decision:** Keep the public setup website as static HTML, CSS, and minimal
+JavaScript in `site/`, deployed by the official GitHub Pages artifact actions.
+
+**Reason:** New operators need a readable guide before cloning the repository,
+and a dependency-free site avoids a second package toolchain and supply chain.
+
+**Consequence:** Operator-facing behavior changes must update the README, the
+Markdown getting-started guide, and the Pages site together.
