@@ -189,7 +189,7 @@ only when existing consumers remain safe.
 
 | Milestone | Status | Exit condition |
 | --- | --- | --- |
-| Public repository and contracts | In progress | Public CI-green scaffold |
+| Public repository and contracts | Complete | Public CI-green scaffold |
 | Upstream compatibility spike | Not started | Pinned build and smoke report |
 | Soulbridge transport | Not started | Async integration without world stalls |
 | Soul Service core | Scaffolded | Durable inbox/outbox and validated APIs |
@@ -211,6 +211,10 @@ versions, test baseline, date, and outcome here.
 ### Compatibility evidence
 
 No upstream combination has been tested by this repository yet.
+
+The branch heads recorded in `config/upstreams.lock.yaml` were resolved on
+2026-08-25 for reproducibility. Their status remains `untested`; pinning is not
+compatibility evidence.
 
 ## 12. Architecture decision log
 

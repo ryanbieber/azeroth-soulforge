@@ -6,7 +6,7 @@ cd "$REPO_ROOT"
 COMPOSE=${COMPOSE:-docker compose}
 
 ./scripts/preflight.sh
-$COMPOSE up --detach --build mariadb ollama soul-service
+$COMPOSE up --detach --build --wait --wait-timeout 180 mariadb ollama soul-service
 
 if ! ./scripts/game-up.sh; then
   echo "game servers failed; stopping infrastructure to avoid a partial app" >&2

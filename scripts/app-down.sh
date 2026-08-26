@@ -7,5 +7,9 @@ COMPOSE=${COMPOSE:-docker compose}
 status=0
 
 ./scripts/game-down.sh || status=1
-$COMPOSE down || status=1
+if test -f .env; then
+  $COMPOSE down || status=1
+else
+  $COMPOSE --env-file .env.example down || status=1
+fi
 exit "$status"
