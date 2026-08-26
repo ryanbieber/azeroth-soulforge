@@ -94,6 +94,20 @@ a startup failure tears down only this Compose project.
 Initial bot/player settings from `.env` seed generated AzerothCore configuration
 once. Later dashboard changes edit that persistent configuration and therefore
 survive container recreation and whole-app shutdown.
+Module configuration follows AzerothCore's generated `etc/modules/` layout;
+startup copies distribution templates to active configuration files before
+applying the initial Playerbot values.
+The core retains its complete level-80 stat tables because lowering
+`MaxPlayerLevel` below the Death Knight start level makes AzerothCore abort.
+The active progression brackets gate content, while the Playerbots-specific
+maximum keeps generated companions at level 19 for the initial phase.
+The worldserver receives the pinned `mod-playerbots/data/sql` tree as a
+read-only bind mount because Playerbots initializes and updates its separate
+database at worldserver startup; AzerothCore's minimized runtime image does not
+otherwise contain module source SQL.
+Authserver and worldserver readiness checks connect to their internal TCP
+listeners, so whole-stack startup does not report success while either process
+is still initializing or caught in a restart loop.
 
 ## 4. Event and reply flow
 

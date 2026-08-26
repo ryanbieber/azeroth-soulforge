@@ -16,11 +16,12 @@ class ControlSettingsTests(unittest.TestCase):
             original = control.CONFIG_DIR
             control.CONFIG_DIR = Path(directory)
             try:
-                path = control.CONFIG_DIR / "playerbots.conf"
+                path = control.CONFIG_DIR / "modules" / "playerbots.conf"
+                path.parent.mkdir()
                 path.write_text("Other.Setting = 7\nAiPlayerbot.MinRandomBots = 50\n", encoding="utf-8")
-                control.write_config_value("playerbots.conf", "AiPlayerbot.MinRandomBots", 75)
+                control.write_config_value("modules/playerbots.conf", "AiPlayerbot.MinRandomBots", 75)
                 self.assertEqual(
-                    control.read_config_value("playerbots.conf", "AiPlayerbot.MinRandomBots", 0), 75
+                    control.read_config_value("modules/playerbots.conf", "AiPlayerbot.MinRandomBots", 0), 75
                 )
                 self.assertIn("Other.Setting = 7", path.read_text(encoding="utf-8"))
             finally:

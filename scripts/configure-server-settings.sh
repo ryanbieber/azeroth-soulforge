@@ -6,9 +6,6 @@ cd "$REPO_ROOT"
 set -a; . ./.env; set +a
 
 MARKER="$REPO_ROOT/.run/server-settings-initialized"
-if test -f "$MARKER"; then
-  exit 0
-fi
 
 set_config() {
   local file=$1 key=$2 value=$3
@@ -31,9 +28,34 @@ path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
 }
 
-set_config runtime/azerothcore/etc/playerbots.conf AiPlayerbot.MinRandomBots "${SOULFORGE_RANDOM_BOTS:-50}"
-set_config runtime/azerothcore/etc/playerbots.conf AiPlayerbot.MaxRandomBots "${SOULFORGE_RANDOM_BOTS:-50}"
-set_config runtime/azerothcore/etc/playerbots.conf AiPlayerbot.MaxAddedBots "${SOULFORGE_MAX_ADDED_BOTS:-40}"
+seed_config() {
+  local file=$1 distribution=$2
+  if ! test -f "$file"; then
+    test -f "$distribution" || { echo "missing configuration template: $distribution" >&2; exit 1; }
+    mkdir -p "$(dirname "$file")"
+    cp "$distribution" "$file"
+  fi
+}
+
+seed_config runtime/azerothcore/etc/modules/playerbots.conf \
+  runtime/azerothcore/etc/modules/playerbots.conf.dist
+seed_config runtime/azerothcore/etc/modules/progression_system.conf \
+  runtime/azerothcore/etc/modules/progression_system.conf.dist
+seed_config runtime/azerothcore/etc/modules/soulbridge.conf \
+  runtime/azerothcore/etc/modules/soulbridge.conf.dist
+seed_config runtime/azerothcore/etc/worldserver.conf \
+  runtime/azerothcore/etc/worldserver.conf.dist
+
+if test -f "$MARKER"; then
+  exit 0
+fi
+
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MinRandomBots "${SOULFORGE_RANDOM_BOTS:-50}"
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MaxRandomBots "${SOULFORGE_RANDOM_BOTS:-50}"
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MaxAddedBots "${SOULFORGE_MAX_ADDED_BOTS:-40}"
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.RandomBotMaxLevel 19
+set_config runtime/azerothcore/etc/modules/progression_system.conf ProgressionSystem.Bracket_0 1
+set_config runtime/azerothcore/etc/modules/progression_system.conf ProgressionSystem.Bracket_1_19 1
 set_config runtime/azerothcore/etc/worldserver.conf PlayerLimit "${SOULFORGE_PLAYER_LIMIT:-100}"
 mkdir -p "$REPO_ROOT/.run"
 touch "$MARKER"

@@ -17,8 +17,8 @@ MAX_BODY = 16 * 1024
 PROJECT = "azeroth-soulforge"
 CONFIG_DIR = Path("/config")
 SETTING_KEYS = {
-    "random_bots": ("playerbots.conf", ("AiPlayerbot.MinRandomBots", "AiPlayerbot.MaxRandomBots"), 0, 200),
-    "max_added_bots": ("playerbots.conf", ("AiPlayerbot.MaxAddedBots",), 1, 80),
+    "random_bots": ("modules/playerbots.conf", ("AiPlayerbot.MinRandomBots", "AiPlayerbot.MaxRandomBots"), 0, 200),
+    "max_added_bots": ("modules/playerbots.conf", ("AiPlayerbot.MaxAddedBots",), 1, 80),
     "player_limit": ("worldserver.conf", ("PlayerLimit",), 1, 1000),
 }
 
