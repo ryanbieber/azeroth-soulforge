@@ -1,8 +1,0 @@
-<Bindings>
-  <Binding name="PARTYCOMMANDER_FOLLOW" header="PARTYCOMMANDER">PartyCommander:ControllerAction("FOLLOW")</Binding>
-  <Binding name="PARTYCOMMANDER_HOLD">PartyCommander:ControllerAction("HOLD")</Binding>
-  <Binding name="PARTYCOMMANDER_ATTACK">PartyCommander:ControllerAction("ATTACK")</Binding>
-  <Binding name="PARTYCOMMANDER_REBUFF">PartyCommander:ControllerAction("REBUFF")</Binding>
-  <Binding name="PARTYCOMMANDER_FLEE">PartyCommander:ControllerAction("FLEE")</Binding>
-  <Binding name="PARTYCOMMANDER_CYCLE_SCOPE">PartyCommander:CycleControllerScope()</Binding>
-</Bindings>

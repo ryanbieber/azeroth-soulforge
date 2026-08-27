@@ -45,6 +45,27 @@ Commands can also be sent to one bot with a whisper:
 /w Botname stay
 ```
 
+## Controller-ready general macros
+
+Create these as **General Macros** (leave Character Specific unchecked). They
+will then be available to every character on the same WoW account, so you only
+need to put them on matching action-bar slots and map those slots through your
+controller software once per character layout. A server cannot create client
+macros for you, so this is the supported account-wide approach.
+
+Normal press controls your current party or raid automatically. Hold **Ctrl**
+to whisper `Wife` only; hold **Shift** to reach healer-role bots. Ctrl takes
+priority if both are held. Replace `Wife` with another companion name only if
+you rename that character.
+
+| Macro | Body |
+| --- | --- |
+| Follow | `/run w=IsControlKeyDown();SendChatMessage(w and"follow"or(IsShiftKeyDown()and"@heal follow"or"follow"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
+| Hold | `/run w=IsControlKeyDown();SendChatMessage(w and"stay"or(IsShiftKeyDown()and"@heal stay"or"stay"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
+| Attack | `/run w=IsControlKeyDown();SendChatMessage(w and"attack"or(IsShiftKeyDown()and"@heal attack"or"attack"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
+| Rebuff | `/run w=IsControlKeyDown();SendChatMessage(w and"rebuff"or(IsShiftKeyDown()and"@heal rebuff"or"rebuff"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
+| Flee | `/run w=IsControlKeyDown();SendChatMessage(w and"flee"or(IsShiftKeyDown()and"@heal flee"or"flee"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
+
 Start with follow, stay, attack, tank attack, pull, flee, and reset. Test more
 specialized strategy commands outside an instance before relying on them in a
 raid.

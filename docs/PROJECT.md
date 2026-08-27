@@ -1,6 +1,6 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.8
+**Document version:** 1.9
 
 **Status:** runnable alpha
 
@@ -229,11 +229,10 @@ relationships/promises/goals, latency analytics, and progression workflows
 remain future work. Progression controls are deliberately absent until backup
 verification and restore testing are automated.
 
-The repository also includes an optional 3.3.5a client addon, Party Commander.
-It sends standard Playerbots commands through party or raid chat from direct
-user clicks or configured key bindings. It can separately address a named
-personal companion or healer-role bots, but it has no Soulforge, LLM, Docker,
-or server-administration authority.
+The repository documents controller-ready General WoW macros for standard
+Playerbots party and raid commands. They are client account data rather than
+server configuration: the owner creates them once as non-character-specific
+macros and maps their action-bar slots through their controller software.
 
 Bridge requests require a shared-secret signature, timestamp window,
 nonce/replay protection, size limits, and strict schema validation. MariaDB,
@@ -496,3 +495,17 @@ authority.
 **Consequence:** The addon is installed only in a user's legal local WoW client,
 never changes bindings automatically, and remains limited to user-initiated
 chat commands supported by Playerbots.
+
+### 2026-08-27 — Supersede the client addon with General Macros
+
+**Decision:** Remove Party Commander and document five controller-ready General
+Macros instead: follow, hold, attack, rebuff, and flee. Each macro chooses the
+current party or raid, with Ctrl for `Wife` and Shift for healer-role bots.
+
+**Reason:** The owner requested a limited controller surface without installing
+or maintaining a client addon.
+
+**Consequence:** WoW keeps macros in client account data, so the realm cannot
+force them onto characters. Creating them as General Macros makes them
+available to every character on that WoW account; players still choose the
+action-bar and controller bindings.

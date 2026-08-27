@@ -159,14 +159,13 @@ memory flow.
 Use `make down` for a normal shutdown. Databases, souls, map data, configuration,
 and model files remain in named Docker volumes and are reused by `make up`.
 
-### Optional controller-sized party controls
+### Controller-ready party macros
 
-The repository includes the 3.3.5a client addon
-[Party Commander](PARTY_COMMANDER_ADDON.md). It gives a human tank five actions
-(Follow, Hold, Attack, Rebuff, Flee) for the current party or raid. Normal
-panel clicks target the group, Ctrl-click targets `Wife`, and Shift-click
-targets healer bots. Controller users need only the five actions and one
-scope-cycle binding; the addon does not overwrite any existing binds.
+Use the General macros in [Playerbots Party Hotkeys](PLAYERBOT_HOTKEYS.md) for
+Follow, Hold, Attack, Rebuff, and Flee. General macros are available to every
+character on the same WoW account; map their action-bar slots with your
+controller software. They default to the current party or raid, use Ctrl for
+`Wife`, and use Shift for healer-role bots.
 
 Run `make backup` before any progression change. Never remove Docker volumes
 unless you intend to delete the realm, and never attempt to reverse progression
