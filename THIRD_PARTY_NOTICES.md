@@ -10,6 +10,7 @@ must review the license attached to the exact revision or model tag they use.
 | mod-playerbots AzerothCore fork | Required core fork | GPL-2.0 |
 | mod-playerbots | Gameplay bot module | GPL-2.0 |
 | mod-progression-system | Optional phased content | Verify pinned revision |
+| mod-ah-bot | Auction-house seller and buyer simulation | GPL-2.0 |
 | Ollama | Local model runtime | Verify installed release |
 | Qwen3.5 model | Default dialogue model | Apache-2.0 on referenced Ollama tag |
 | EmbeddingGemma | Default embedding model | Model-specific Gemma terms |

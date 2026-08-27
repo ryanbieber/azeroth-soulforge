@@ -1,5 +1,5 @@
 schema_version: 1
-last_reviewed: "2026-08-25"
+last_reviewed: "2026-08-27"
 upstreams:
   - name: playerbots-azerothcore
     url: https://github.com/mod-playerbots/azerothcore-wotlk.git
@@ -16,5 +16,10 @@ upstreams:
     branch: main
     commit: 84a25e6df8497d83432e61aa38557a92c156e77d
     verification_status: docker-build-passed-2026-08-26
+  - name: mod-ah-bot
+    url: https://github.com/azerothcore/mod-ah-bot.git
+    branch: master
+    commit: a680cc1c98290713e9b3d3289544af78e5186dc1
+    verification_status: docker-build-passed-2026-08-27
 
 # Build evidence and remaining live-smoke limitations are in docs/PROJECT.md.

@@ -28,6 +28,27 @@ class ControlSettingsTests(unittest.TestCase):
             finally:
                 control.CONFIG_DIR = original
 
+    def test_auction_house_character_must_be_logged_out_when_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            original = control.CONFIG_DIR
+            control.CONFIG_DIR = Path(directory)
+            try:
+                path = control.CONFIG_DIR / "modules" / "mod_ahbot.conf"
+                path.parent.mkdir()
+                path.write_text(
+                    "AuctionHouseBot.Account = 0\nAuctionHouseBot.GUID = 0\n"
+                    "AuctionHouseBot.EnableSeller = 0\nAuctionHouseBot.EnableBuyer = 0\n"
+                    "AuctionHouseBot.ItemsPerCycle = 200\n",
+                    encoding="utf-8",
+                )
+                with patch.object(control, "mysql", return_value="42\tAuctioneer\t7\tOWNER\t1\n"):
+                    with self.assertRaisesRegex(ValueError, "log out"):
+                        control.update_auction_house_settings({
+                            "auction_house_character_guid": "42", "auction_house_seller": True,
+                        })
+            finally:
+                control.CONFIG_DIR = original
+
     def test_realm_name_rejects_sql_metacharacters(self) -> None:
         with self.assertRaises(ValueError):
             control.update_realm_name("Realm'; DROP TABLE realmlist; --")
@@ -71,6 +92,39 @@ class ControlSettingsTests(unittest.TestCase):
                 control.update_rate_setting("xp_rate", value)
         with self.assertRaisesRegex(ValueError, "profession_skill_rate must be between"):
             control.update_rate_setting("profession_skill_rate", 2.5)
+
+    def test_auction_house_requires_a_character_before_enabling(self) -> None:
+        with self.assertRaisesRegex(ValueError, "choose a dedicated"):
+            control.update_auction_house_settings({
+                "auction_house_character_guid": "0", "auction_house_seller": True,
+            })
+
+    def test_auction_house_character_and_modes_are_written_together(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            original = control.CONFIG_DIR
+            control.CONFIG_DIR = Path(directory)
+            try:
+                path = control.CONFIG_DIR / "modules" / "mod_ahbot.conf"
+                path.parent.mkdir()
+                path.write_text(
+                    "AuctionHouseBot.Account = 0\nAuctionHouseBot.GUID = 0\n"
+                    "AuctionHouseBot.EnableSeller = 0\nAuctionHouseBot.EnableBuyer = 0\n"
+                    "AuctionHouseBot.ItemsPerCycle = 200\n",
+                    encoding="utf-8",
+                )
+                with patch.object(control, "mysql", return_value="42\tAuctioneer\t7\tOWNER\t0\n"):
+                    changed = control.update_auction_house_settings({
+                        "auction_house_character_guid": "42", "auction_house_seller": True,
+                        "auction_house_buyer": False, "auction_house_items_per_cycle": 125,
+                    })
+                self.assertTrue(changed)
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("AuctionHouseBot.Account = 7", text)
+                self.assertIn("AuctionHouseBot.GUID = 42", text)
+                self.assertIn("AuctionHouseBot.EnableSeller = 1", text)
+                self.assertIn("AuctionHouseBot.ItemsPerCycle = 125", text)
+            finally:
+                control.CONFIG_DIR = original
 
 
 if __name__ == "__main__":

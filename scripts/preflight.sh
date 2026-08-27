@@ -30,6 +30,7 @@ ip -4 address show | grep -Fq "${SOULFORGE_LAN_IP}/" || fail "SOULFORGE_LAN_IP i
 
 test -d runtime/source/azerothcore/.git || fail "upstream source missing; run make setup"
 test -f runtime/source/azerothcore/modules/mod-soulbridge/include.sh || fail "Soulbridge is not synced; run make setup"
+test -f runtime/source/azerothcore/modules/mod-ah-bot/conf/mod_ahbot.conf.dist || fail "Auction House Bot source is missing; run make setup"
 mkdir -p runtime/azerothcore/etc runtime/azerothcore/logs backups
 docker compose config --quiet
 echo "preflight: complete"

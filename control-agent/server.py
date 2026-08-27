@@ -55,6 +55,7 @@ REALM_TYPES = {
     "rp": 6,
     "rp_pvp": 8,
 }
+AHBOT_CONFIG = "modules/mod_ahbot.conf"
 
 
 def run(command: list[str], *, input_text: str | None = None, timeout: int = 45) -> str:
@@ -187,6 +188,77 @@ def update_rate_setting(name: str, value: Any) -> None:
         write_config_value(filename, key, normalized)
 
 
+def auction_house_characters() -> list[dict[str, Any]]:
+    query = """
+SELECT c.guid,c.name,c.account,a.username,c.online
+FROM acore_characters.characters c
+JOIN acore_auth.account a ON a.id=c.account
+WHERE LOWER(a.username) NOT LIKE 'rndbot%'
+  AND LOWER(a.username) NOT LIKE 'addclass%'
+ORDER BY a.username,c.name;
+"""
+    characters = []
+    for line in mysql(query).splitlines():
+        fields = line.split("\t")
+        if len(fields) != 5:
+            continue
+        guid, name, account, username, online = fields
+        characters.append({
+            "guid": guid, "name": name, "account_id": int(account),
+            "account": username, "online": online == "1",
+        })
+    return characters
+
+
+def auction_house_settings() -> dict[str, Any]:
+    return {
+        "auction_house_character_guid": str(read_config_value(AHBOT_CONFIG, "AuctionHouseBot.GUID", 0)),
+        "auction_house_seller": bool(read_config_value(AHBOT_CONFIG, "AuctionHouseBot.EnableSeller", 0)),
+        "auction_house_buyer": bool(read_config_value(AHBOT_CONFIG, "AuctionHouseBot.EnableBuyer", 0)),
+        "auction_house_items_per_cycle": read_config_value(AHBOT_CONFIG, "AuctionHouseBot.ItemsPerCycle", 200),
+    }
+
+
+def update_auction_house_settings(payload: dict[str, Any]) -> bool:
+    names = {
+        "auction_house_character_guid", "auction_house_seller", "auction_house_buyer",
+        "auction_house_items_per_cycle",
+    }
+    if not names.intersection(payload):
+        return False
+
+    current = auction_house_settings()
+    guid_text = str(payload.get("auction_house_character_guid", current["auction_house_character_guid"]))
+    if not re.fullmatch(r"0|[1-9][0-9]{0,9}", guid_text):
+        raise ValueError("auction_house_character_guid must identify an available character")
+    guid = int(guid_text)
+    seller = payload.get("auction_house_seller", current["auction_house_seller"])
+    buyer = payload.get("auction_house_buyer", current["auction_house_buyer"])
+    items = payload.get("auction_house_items_per_cycle", current["auction_house_items_per_cycle"])
+    if not isinstance(seller, bool) or not isinstance(buyer, bool):
+        raise ValueError("auction house seller and buyer settings must be boolean")
+    if isinstance(items, bool) or not isinstance(items, int) or not 1 <= items <= 1000:
+        raise ValueError("auction_house_items_per_cycle must be between 1 and 1000")
+    if (seller or buyer) and guid == 0:
+        raise ValueError("choose a dedicated auction-house character before enabling the bot")
+
+    account = 0
+    if guid:
+        rows = [entry for entry in auction_house_characters() if entry["guid"] == guid_text]
+        if not rows:
+            raise ValueError("the selected auction-house character is unavailable")
+        if (seller or buyer) and rows[0]["online"]:
+            raise ValueError("log out the dedicated auction-house character before enabling the bot")
+        account = rows[0]["account_id"]
+
+    write_config_value(AHBOT_CONFIG, "AuctionHouseBot.Account", account)
+    write_config_value(AHBOT_CONFIG, "AuctionHouseBot.GUID", guid)
+    write_config_value(AHBOT_CONFIG, "AuctionHouseBot.EnableSeller", int(seller))
+    write_config_value(AHBOT_CONFIG, "AuctionHouseBot.EnableBuyer", int(buyer))
+    write_config_value(AHBOT_CONFIG, "AuctionHouseBot.ItemsPerCycle", items)
+    return True
+
+
 def list_bots() -> list[dict[str, Any]]:
     query = """
 SELECT c.guid,c.name,c.level,c.race,c.class,c.online,a.username
@@ -237,9 +309,12 @@ class ControlHandler(BaseHTTPRequestHandler):
                 settings[name] = read_config_value(filename, keys[0], minimum)
             for name, (filename, keys, _, _, default) in RATE_SETTING_KEYS.items():
                 settings[name] = read_config_value(filename, keys[0], default)
+            settings.update(auction_house_settings())
             self._json(HTTPStatus.OK, settings)
         elif self.path == "/v1/bots":
             self._json(HTTPStatus.OK, {"bots": list_bots()})
+        elif self.path == "/v1/auction-house/characters":
+            self._json(HTTPStatus.OK, {"characters": auction_house_characters()})
         else:
             self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
@@ -271,6 +346,8 @@ class ControlHandler(BaseHTTPRequestHandler):
                     if name not in payload:
                         continue
                     update_rate_setting(name, payload[name])
+                    changed = True
+                if update_auction_house_settings(payload):
                     changed = True
                 if "realm_name" in payload:
                     update_realm_name(str(payload["realm_name"]).strip())

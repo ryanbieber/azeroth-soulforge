@@ -7,6 +7,7 @@ SOURCE_DIR=runtime/source/azerothcore
 CORE_SHA=9fb906bb7296212ff42fc95ff73a92aaf8554f0d
 PLAYERBOTS_SHA=2f7d9f774987d0157c6a0d0cc08c40bec3db3945
 PROGRESSION_SHA=84a25e6df8497d83432e61aa38557a92c156e77d
+AHBOT_SHA=a680cc1c98290713e9b3d3289544af78e5186dc1
 
 mkdir -p runtime/source runtime/azerothcore/etc runtime/azerothcore/logs backups
 if ! test -d "$SOURCE_DIR/.git"; then
@@ -29,6 +30,7 @@ clone_module() {
 }
 clone_module https://github.com/mod-playerbots/mod-playerbots.git "$SOURCE_DIR/modules/mod-playerbots" "$PLAYERBOTS_SHA"
 clone_module https://github.com/azerothcore/mod-progression-system.git "$SOURCE_DIR/modules/mod-progression-system" "$PROGRESSION_SHA"
+clone_module https://github.com/azerothcore/mod-ah-bot.git "$SOURCE_DIR/modules/mod-ah-bot" "$AHBOT_SHA"
 
 TARGET="$SOURCE_DIR/modules/mod-soulbridge"
 test "$TARGET" = "runtime/source/azerothcore/modules/mod-soulbridge"

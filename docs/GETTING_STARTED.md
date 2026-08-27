@@ -108,6 +108,12 @@ reputation, item loot, money drops, and honor. Profession skill gain accepts
 whole-number multipliers from 1×–10×. Applying a rate safely restarts the
 worldserver; it does not unlock progression brackets or raise the bot level cap.
 
+Under **Settings → Auction house**, choose a dedicated unused character before
+enabling the seller or buyer. Create that alt normally in the WoW client, log
+it out, refresh the dashboard, and select it. Do not play the assigned
+auctioneer; the module uses its identity for market operations. The seller and
+buyer are disabled by default.
+
 ## 6. Connect a WoW client
 
 On every client computer, locate the locale directory—for example `Data/enUS`

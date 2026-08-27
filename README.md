@@ -3,7 +3,8 @@
 Azeroth Soulforge is a self-hosted AzerothCore 3.3.5a realm with Playerbots,
 staged progression, persistent companion profiles and memories, and local
 dialogue through Ollama. A password-protected React dashboard manages bots,
-souls, models, and routine server settings from your trusted home network.
+souls, models, auction-house automation, and routine server settings from your
+trusted home network.
 
 > A Soulforge “soul” is a simulation of character continuity. It is not a claim
 > that a bot or language model is conscious or alive.
@@ -96,7 +97,8 @@ gameplay action—the language model is only a social layer.
   and soul data.
 
 For the complete walkthrough, troubleshooting, IP-change procedure, and first
-soul instructions, read [Getting Started](docs/GETTING_STARTED.md).
+soul instructions, read [Getting Started](docs/GETTING_STARTED.md). Party and
+raid macros are in [Playerbots Party Hotkeys](docs/PLAYERBOT_HOTKEYS.md).
 
 ## Repository map
 
@@ -107,6 +109,7 @@ soul instructions, read [Getting Started](docs/GETTING_STARTED.md).
 - `contracts/` — versioned public wire formats.
 - `site/` — static GitHub Pages documentation.
 - `docs/PROJECT.md` — durable architecture and project decisions.
+- `docs/PLAYERBOT_HOTKEYS.md` — party and raid macro cheat sheet.
 - `examples/profiles/Thorn/SKILL.md` — fictional companion profile example.
 
 ## Legal and project status

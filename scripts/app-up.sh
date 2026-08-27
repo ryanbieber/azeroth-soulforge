@@ -20,6 +20,7 @@ trap cleanup_on_error ERR
 $COMPOSE up --detach --build ac-database ac-db-import
 $COMPOSE wait ac-db-import
 ./scripts/configure-realm.sh
+./scripts/install-module-sql.sh
 ./scripts/configure-server-settings.sh
 ./scripts/create-account.sh
 

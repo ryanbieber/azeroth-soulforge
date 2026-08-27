@@ -8,6 +8,7 @@ required=(
   AGENTS.md README.md LICENSE Makefile compose.yaml .env.example .dockerignore docs/PROJECT.md
   docs/LAN_SETUP.md scripts/setup-source.sh scripts/configure-realm.sh
   scripts/create-account.sh scripts/configure-firewall.sh
+  scripts/install-module-sql.sh
   contracts/openapi.yaml contracts/admin-openapi.yaml contracts/events.schema.json
   contracts/soul-export.schema.json soul-service/pyproject.toml
   soul-service/README.md mod-soulbridge/CMakeLists.txt
@@ -16,7 +17,7 @@ required=(
   dashboard/src/main.jsx config/nginx-soulforge.conf config/upstreams.lock.yaml
   examples/profiles/README.md examples/profiles/Thorn/SKILL.md
   scripts/validate-skill-inference.py
-  docs/GETTING_STARTED.md site/index.html site/assets/styles.css
+  docs/GETTING_STARTED.md docs/PLAYERBOT_HOTKEYS.md site/index.html site/assets/styles.css
   site/assets/app.js site/.nojekyll .github/workflows/pages.yml
   scripts/validate-pages.py
 )

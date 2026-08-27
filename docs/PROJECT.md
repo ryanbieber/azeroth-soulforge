@@ -1,10 +1,10 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.5
+**Document version:** 1.6
 
 **Status:** runnable alpha
 
-**Last reviewed:** 2026-08-26
+**Last reviewed:** 2026-08-27
 
 This document is the durable source of truth for the project. Code, contracts,
 operations, and milestone claims must agree with it.
@@ -69,6 +69,9 @@ trusted LAN browser --HTTPS--> nginx gateway --> React assets/admin API
 
 - **AzerothCore and Playerbots** own combat, movement, questing, inventory,
   gearing, talents, groups, raids, and every gameplay action.
+- **mod-ah-bot** optionally supplies auction-house inventory and purchasing
+  through a dedicated, owner-selected character. Both buyer and seller start
+  disabled.
 - **mod-soulbridge** observes approved events and transports them. It contains
   no personality or memory policy.
 - **Soul Service** owns profiles, memory, relationships, prompts, inference,
@@ -97,6 +100,10 @@ survive container recreation and whole-app shutdown.
 Module configuration follows AzerothCore's generated `etc/modules/` layout;
 startup copies distribution templates to active configuration files before
 applying the initial Playerbot values.
+Startup applies the pinned Auction House Bot world schema through a one-time
+migration ledger. It adopts an already complete schema but refuses to replace
+an incomplete schema automatically because the upstream base SQL is
+destructive.
 The core retains its complete level-80 stat tables because lowering
 `MaxPlayerLevel` below the Death Knight start level makes AzerothCore abort.
 The active progression brackets gate content, while the Playerbots-specific
@@ -214,7 +221,8 @@ The dashboard currently supports Playerbot roster discovery; soul seeding,
 editing, pausing, and per-character SKILL.md authoring; memory
 inspection/deletion; service health and game-server
 lifecycle; realm name and type, bot population, player-limit, bounded gameplay
-rate settings; global
+rate settings; optional dedicated-character auction-house buyer/seller
+automation; global
 dialogue tuning; and Ollama model installation/selection. Export,
 relationships/promises/goals, latency analytics, and progression workflows
 remain future work. Progression controls are deliberately absent until backup
@@ -278,6 +286,12 @@ ac-db-import ac-client-data-init soul-service`. Revisions were core
 modules and produced worldserver, authserver, dbimport, client-data, and Soul
 Service images successfully. A live database/client login smoke test remains
 pending operator secrets.
+
+On 2026-08-27, the same Docker/Clang toolchain built and linked worldserver
+with official `mod-ah-bot` revision
+`a680cc1c98290713e9b3d3289544af78e5186dc1` alongside the pinned Playerbots,
+progression, and Soulbridge modules. The module configuration and all three
+world-database SQL inputs were present in the resulting build context.
 
 Also on 2026-08-26, Docker Engine 29.4 built the React-enabled Soul Service and
 Docker CLI 29.6.1 control-agent images. `./scripts/verify.sh` passed Python admin
@@ -434,3 +448,17 @@ keys.
 **Consequence:** Values are restricted to 0.1×–10×, profession gains use whole
 numbers from 1×–10×, and applying any rate restarts only the worldserver.
 Progression brackets and Playerbot level caps remain independent safety gates.
+
+### 2026-08-27 — Keep Auction House Bot opt-in
+
+**Decision:** Build the official `mod-ah-bot`, but require an unused, logged-out
+character selected in the dashboard and leave both buying and selling disabled
+until the owner enables them.
+
+**Reason:** A populated auction house improves a private realm, while explicit
+character assignment prevents the module from silently taking over a played
+character.
+
+**Consequence:** Startup applies the pinned module schema through a guarded
+migration. Transmog, solo-scaling, and account-wide-convenience modules remain
+out of scope.

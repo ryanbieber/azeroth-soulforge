@@ -43,6 +43,8 @@ seed_config runtime/azerothcore/etc/modules/progression_system.conf \
   runtime/azerothcore/etc/modules/progression_system.conf.dist
 seed_config runtime/azerothcore/etc/modules/soulbridge.conf \
   runtime/azerothcore/etc/modules/soulbridge.conf.dist
+seed_config runtime/azerothcore/etc/modules/mod_ahbot.conf \
+  runtime/azerothcore/etc/modules/mod_ahbot.conf.dist
 seed_config runtime/azerothcore/etc/worldserver.conf \
   runtime/azerothcore/etc/worldserver.conf.dist
 

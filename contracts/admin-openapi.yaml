@@ -83,6 +83,10 @@ paths:
     get:
       summary: List generated random Playerbot characters
       responses: {"200": {description: Playerbot roster}}
+  /auction-house/characters:
+    get:
+      summary: List non-Playerbot characters eligible for dedicated auction-house duty
+      responses: {"200": {description: Eligible character roster}}
   /server/status:
     get:
       summary: Return allowlisted stack status
@@ -137,6 +141,10 @@ components:
         money_rate: {type: number, minimum: 0.1, maximum: 10}
         honor_rate: {type: number, minimum: 0.1, maximum: 10}
         profession_skill_rate: {type: integer, minimum: 1, maximum: 10}
+        auction_house_character_guid: {type: string, pattern: "^(0|[1-9][0-9]{0,9})$"}
+        auction_house_seller: {type: boolean}
+        auction_house_buyer: {type: boolean}
+        auction_house_items_per_cycle: {type: integer, minimum: 1, maximum: 1000}
         chat_model: {type: string}
         souls_enabled: {type: boolean}
         temperature: {type: number, minimum: 0, maximum: 2}
@@ -146,7 +154,7 @@ components:
       allOf:
         - {$ref: "#/components/schemas/ServerSettingsUpdate"}
         - type: object
-          required: [realm_name, realm_type, random_bots, max_added_bots, player_limit, xp_rate, reputation_rate, loot_rate, money_rate, honor_rate, profession_skill_rate, chat_model, souls_enabled, temperature, max_tokens]
+          required: [realm_name, realm_type, random_bots, max_added_bots, player_limit, xp_rate, reputation_rate, loot_rate, money_rate, honor_rate, profession_skill_rate, auction_house_character_guid, auction_house_seller, auction_house_buyer, auction_house_items_per_cycle, chat_model, souls_enabled, temperature, max_tokens]
   securitySchemes:
     adminSession:
       type: apiKey

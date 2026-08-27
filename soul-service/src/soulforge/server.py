@@ -592,6 +592,9 @@ class SoulHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/admin/v1/bots":
             if self._admin_session():
                 self._admin_control("GET", "/v1/bots")
+        elif parsed.path == "/admin/v1/auction-house/characters":
+            if self._admin_session():
+                self._admin_control("GET", "/v1/auction-house/characters")
         elif parsed.path == "/admin/v1/models":
             if self._admin_session():
                 self._json(HTTPStatus.OK, {"models": self.server.installed_models(), "active": self.server.model})
@@ -760,6 +763,8 @@ class SoulHandler(BaseHTTPRequestHandler):
                 "realm_name", "realm_type", "random_bots", "max_added_bots", "player_limit",
                 "xp_rate", "reputation_rate", "loot_rate", "money_rate", "honor_rate",
                 "profession_skill_rate",
+                "auction_house_character_guid", "auction_house_seller", "auction_house_buyer",
+                "auction_house_items_per_cycle",
             }
             remote = {key: value for key, value in payload.items() if key in remote_keys}
             if local:
