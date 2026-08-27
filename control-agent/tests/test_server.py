@@ -93,6 +93,27 @@ class ControlSettingsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "profession_skill_rate must be between"):
             control.update_rate_setting("profession_skill_rate", 2.5)
 
+    def test_random_bot_ceiling_is_two_thousand(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            original = control.CONFIG_DIR
+            control.CONFIG_DIR = Path(directory)
+            try:
+                path = control.CONFIG_DIR / "modules" / "playerbots.conf"
+                path.parent.mkdir()
+                path.write_text(
+                    "AiPlayerbot.MinRandomBots = 50\nAiPlayerbot.MaxRandomBots = 50\n",
+                    encoding="utf-8",
+                )
+                control.update_setting("random_bots", 2000)
+                self.assertEqual(
+                    control.read_config_value("modules/playerbots.conf", "AiPlayerbot.MinRandomBots", 0),
+                    2000,
+                )
+                with self.assertRaisesRegex(ValueError, "random_bots must be between"):
+                    control.update_setting("random_bots", 2001)
+            finally:
+                control.CONFIG_DIR = original
+
     def test_auction_house_requires_a_character_before_enabling(self) -> None:
         with self.assertRaisesRegex(ValueError, "choose a dedicated"):
             control.update_auction_house_settings({

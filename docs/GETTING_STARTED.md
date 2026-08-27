@@ -114,6 +114,12 @@ it out, refresh the dashboard, and select it. Do not play the assigned
 auctioneer; the module uses its identity for market operations. The seller and
 buyer are disabled by default.
 
+The **Random bots** setting accepts 0–2,000. This is a safety ceiling, not a
+promise that every host can run 2,000 bots smoothly. Increase the population in
+steps, allow the bots to finish logging in, and watch worldserver CPU and game
+latency before raising it again. Random population bots do not automatically
+receive Soulforge profiles or invoke the dialogue model.
+
 ## 6. Connect a WoW client
 
 On every client computer, locate the locale directory—for example `Data/enUS`

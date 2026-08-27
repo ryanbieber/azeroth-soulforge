@@ -17,7 +17,7 @@ MAX_BODY = 16 * 1024
 PROJECT = "azeroth-soulforge"
 CONFIG_DIR = Path("/config")
 SETTING_KEYS = {
-    "random_bots": ("modules/playerbots.conf", ("AiPlayerbot.MinRandomBots", "AiPlayerbot.MaxRandomBots"), 0, 200),
+    "random_bots": ("modules/playerbots.conf", ("AiPlayerbot.MinRandomBots", "AiPlayerbot.MaxRandomBots"), 0, 2000),
     "max_added_bots": ("modules/playerbots.conf", ("AiPlayerbot.MaxAddedBots",), 1, 80),
     "player_limit": ("worldserver.conf", ("PlayerLimit",), 1, 1000),
 }
@@ -188,6 +188,14 @@ def update_rate_setting(name: str, value: Any) -> None:
         write_config_value(filename, key, normalized)
 
 
+def update_setting(name: str, value: Any) -> None:
+    filename, keys, minimum, maximum = SETTING_KEYS[name]
+    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
+        raise ValueError(f"{name} must be between {minimum} and {maximum}")
+    for key in keys:
+        write_config_value(filename, key, value)
+
+
 def auction_house_characters() -> list[dict[str, Any]]:
     query = """
 SELECT c.guid,c.name,c.account,a.username,c.online
@@ -333,14 +341,10 @@ class ControlHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, {"status": "accepted", "action": action})
             elif self.path == "/v1/settings":
                 changed = False
-                for name, (filename, keys, minimum, maximum) in SETTING_KEYS.items():
+                for name in SETTING_KEYS:
                     if name not in payload:
                         continue
-                    value = payload[name]
-                    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
-                        raise ValueError(f"{name} must be between {minimum} and {maximum}")
-                    for key in keys:
-                        write_config_value(filename, key, value)
+                    update_setting(name, payload[name])
                     changed = True
                 for name in RATE_SETTING_KEYS:
                     if name not in payload:

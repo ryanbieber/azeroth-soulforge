@@ -1,6 +1,6 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.6
+**Document version:** 1.7
 
 **Status:** runnable alpha
 
@@ -448,6 +448,18 @@ keys.
 **Consequence:** Values are restricted to 0.1×–10×, profession gains use whole
 numbers from 1×–10×, and applying any rate restarts only the worldserver.
 Progression brackets and Playerbot level caps remain independent safety gates.
+
+### 2026-08-27 — Allow large staged random-bot populations
+
+**Decision:** Permit 0–2,000 random bots through the validated dashboard while
+retaining a conservative first-run default.
+
+**Reason:** Capable hosts can create a busier world, and random population bots
+do not need Soulforge profiles or LLM inference.
+
+**Consequence:** The 2,000-bot value is an administrative ceiling rather than a
+hardware guarantee. Operators must increase populations in stages and monitor
+worldserver CPU and latency.
 
 ### 2026-08-27 — Keep Auction House Bot opt-in
 
