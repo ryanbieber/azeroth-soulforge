@@ -131,6 +131,12 @@ components:
         random_bots: {type: integer, minimum: 0, maximum: 200}
         max_added_bots: {type: integer, minimum: 1, maximum: 80}
         player_limit: {type: integer, minimum: 1, maximum: 1000}
+        xp_rate: {type: number, minimum: 0.1, maximum: 10}
+        reputation_rate: {type: number, minimum: 0.1, maximum: 10}
+        loot_rate: {type: number, minimum: 0.1, maximum: 10}
+        money_rate: {type: number, minimum: 0.1, maximum: 10}
+        honor_rate: {type: number, minimum: 0.1, maximum: 10}
+        profession_skill_rate: {type: integer, minimum: 1, maximum: 10}
         chat_model: {type: string}
         souls_enabled: {type: boolean}
         temperature: {type: number, minimum: 0, maximum: 2}
@@ -140,7 +146,7 @@ components:
       allOf:
         - {$ref: "#/components/schemas/ServerSettingsUpdate"}
         - type: object
-          required: [realm_name, realm_type, random_bots, max_added_bots, player_limit, chat_model, souls_enabled, temperature, max_tokens]
+          required: [realm_name, realm_type, random_bots, max_added_bots, player_limit, xp_rate, reputation_rate, loot_rate, money_rate, honor_rate, profession_skill_rate, chat_model, souls_enabled, temperature, max_tokens]
   securitySchemes:
     adminSession:
       type: apiKey

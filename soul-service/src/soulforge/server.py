@@ -756,7 +756,11 @@ class SoulHandler(BaseHTTPRequestHandler):
                     raise ValueError("max_tokens must be between 32 and 512")
                 self.server.max_tokens = tokens
                 local["max_tokens"] = str(tokens)
-            remote_keys = {"realm_name", "realm_type", "random_bots", "max_added_bots", "player_limit"}
+            remote_keys = {
+                "realm_name", "realm_type", "random_bots", "max_added_bots", "player_limit",
+                "xp_rate", "reputation_rate", "loot_rate", "money_rate", "honor_rate",
+                "profession_skill_rate",
+            }
             remote = {key: value for key, value in payload.items() if key in remote_keys}
             if local:
                 self.server.store.set_settings(local)

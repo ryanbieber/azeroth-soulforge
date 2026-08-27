@@ -1,6 +1,6 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.4
+**Document version:** 1.5
 
 **Status:** runnable alpha
 
@@ -213,7 +213,8 @@ or container API. The browser never receives any infrastructure secret.
 The dashboard currently supports Playerbot roster discovery; soul seeding,
 editing, pausing, and per-character SKILL.md authoring; memory
 inspection/deletion; service health and game-server
-lifecycle; realm name and type, bot population and player-limit settings; global
+lifecycle; realm name and type, bot population, player-limit, bounded gameplay
+rate settings; global
 dialogue tuning; and Ollama model installation/selection. Export,
 relationships/promises/goals, latency analytics, and progression workflows
 remain future work. Progression controls are deliberately absent until backup
@@ -420,3 +421,16 @@ configuration files or issuing database commands on the host.
 
 **Consequence:** Free-for-all PvP and arbitrary numeric realm types remain
 outside the control-agent allowlist.
+
+### 2026-08-27 — Expose bounded gameplay rates
+
+**Decision:** Let administrators adjust grouped experience, reputation, item
+loot, money, honor, and profession skill-gain multipliers from the dashboard.
+
+**Reason:** These are common private-realm preferences and should not require
+host access or error-prone manual edits across several related configuration
+keys.
+
+**Consequence:** Values are restricted to 0.1×–10×, profession gains use whole
+numbers from 1×–10×, and applying any rate restarts only the worldserver.
+Progression brackets and Playerbot level caps remain independent safety gates.

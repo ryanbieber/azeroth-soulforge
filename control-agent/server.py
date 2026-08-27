@@ -21,6 +21,34 @@ SETTING_KEYS = {
     "max_added_bots": ("modules/playerbots.conf", ("AiPlayerbot.MaxAddedBots",), 1, 80),
     "player_limit": ("worldserver.conf", ("PlayerLimit",), 1, 1000),
 }
+RATE_SETTING_KEYS = {
+    "xp_rate": (
+        "worldserver.conf",
+        (
+            "Rate.XP.Kill", "Rate.XP.Quest", "Rate.XP.Quest.DF", "Rate.XP.Explore", "Rate.XP.Pet",
+            "Rate.XP.BattlegroundKillAV", "Rate.XP.BattlegroundKillWSG",
+            "Rate.XP.BattlegroundKillAB", "Rate.XP.BattlegroundKillEOTS",
+            "Rate.XP.BattlegroundKillSOTA", "Rate.XP.BattlegroundKillIC",
+            "Rate.XP.BattlegroundBonus",
+        ),
+        0.1, 10.0, 1.0,
+    ),
+    "reputation_rate": ("worldserver.conf", ("Rate.Reputation.Gain",), 0.1, 10.0, 1.0),
+    "loot_rate": (
+        "worldserver.conf",
+        (
+            "Rate.Drop.Item.Poor", "Rate.Drop.Item.Normal", "Rate.Drop.Item.Uncommon",
+            "Rate.Drop.Item.Rare", "Rate.Drop.Item.Epic", "Rate.Drop.Item.Legendary",
+            "Rate.Drop.Item.Artifact", "Rate.Drop.Item.Referenced",
+        ),
+        0.1, 10.0, 1.0,
+    ),
+    "money_rate": ("worldserver.conf", ("Rate.Drop.Money",), 0.1, 10.0, 1.0),
+    "honor_rate": ("worldserver.conf", ("Rate.Honor",), 0.1, 10.0, 1.0),
+    "profession_skill_rate": (
+        "worldserver.conf", ("SkillGain.Crafting", "SkillGain.Gathering"), 1, 10, 1,
+    ),
+}
 REALM_TYPES = {
     "normal": 0,
     "pvp": 1,
@@ -75,25 +103,26 @@ def service_state(service: str) -> dict[str, Any]:
         return {"service": service, "status": "missing", "running": False, "detail": str(error)}
 
 
-def read_config_value(filename: str, key: str, default: int) -> int:
+def read_config_value(filename: str, key: str, default: int | float) -> int | float:
     path = CONFIG_DIR / filename
     if not path.exists():
         return default
-    pattern = re.compile(rf"^\s*{re.escape(key)}\s*=\s*(\d+)\s*$")
+    pattern = re.compile(rf"^\s*{re.escape(key)}\s*=\s*(\d+(?:\.\d+)?)\s*$")
     for line in path.read_text(encoding="utf-8").splitlines():
         match = pattern.match(line)
         if match:
-            return int(match.group(1))
+            value = float(match.group(1))
+            return int(value) if isinstance(default, int) else value
     return default
 
 
-def write_config_value(filename: str, key: str, value: int) -> None:
+def write_config_value(filename: str, key: str, value: int | float) -> None:
     path = CONFIG_DIR / filename
     if not path.exists():
         raise RuntimeError(f"{filename} is unavailable; run make up once")
     lines = path.read_text(encoding="utf-8").splitlines()
     pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
-    replacement = f"{key} = {value}"
+    replacement = f"{key} = {value:g}"
     updated = False
     for index, line in enumerate(lines):
         if pattern.match(line):
@@ -147,6 +176,17 @@ def update_realm_type(value: str) -> None:
     mysql(f"UPDATE realmlist SET icon={number} WHERE id=1;", "acore_auth")
 
 
+def update_rate_setting(name: str, value: Any) -> None:
+    filename, keys, minimum, maximum, _ = RATE_SETTING_KEYS[name]
+    invalid_integer = isinstance(minimum, int) and not isinstance(value, int)
+    if (isinstance(value, bool) or not isinstance(value, (int, float)) or invalid_integer
+            or not minimum <= value <= maximum):
+        raise ValueError(f"{name} must be between {minimum} and {maximum}")
+    normalized = int(value) if isinstance(minimum, int) else float(value)
+    for key in keys:
+        write_config_value(filename, key, normalized)
+
+
 def list_bots() -> list[dict[str, Any]]:
     query = """
 SELECT c.guid,c.name,c.level,c.race,c.class,c.online,a.username
@@ -195,6 +235,8 @@ class ControlHandler(BaseHTTPRequestHandler):
             settings: dict[str, Any] = {"realm_name": realm_name(), "realm_type": realm_type()}
             for name, (filename, keys, minimum, _) in SETTING_KEYS.items():
                 settings[name] = read_config_value(filename, keys[0], minimum)
+            for name, (filename, keys, _, _, default) in RATE_SETTING_KEYS.items():
+                settings[name] = read_config_value(filename, keys[0], default)
             self._json(HTTPStatus.OK, settings)
         elif self.path == "/v1/bots":
             self._json(HTTPStatus.OK, {"bots": list_bots()})
@@ -224,6 +266,11 @@ class ControlHandler(BaseHTTPRequestHandler):
                         raise ValueError(f"{name} must be between {minimum} and {maximum}")
                     for key in keys:
                         write_config_value(filename, key, value)
+                    changed = True
+                for name in RATE_SETTING_KEYS:
+                    if name not in payload:
+                        continue
+                    update_rate_setting(name, payload[name])
                     changed = True
                 if "realm_name" in payload:
                     update_realm_name(str(payload["realm_name"]).strip())

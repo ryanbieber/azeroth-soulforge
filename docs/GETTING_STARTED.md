@@ -99,9 +99,14 @@ certificate for the private LAN address. Verify the address before accepting
 it, then sign in using `SOULFORGE_ADMIN_PASSWORD`.
 
 The dashboard manages game-service lifecycle, realm name and
-Normal/PvP/RP/RP-PvP type, bot population settings, soul profiles, memories,
-character `SKILL.md` guidance, and installed
+Normal/PvP/RP/RP-PvP type, bot population, bounded gameplay rates, soul
+profiles, memories, character `SKILL.md` guidance, and installed
 Ollama models. Do not publish this dashboard through a router or public tunnel.
+
+Under **Settings → Gameplay rates**, multipliers from 0.1×–10× control XP,
+reputation, item loot, money drops, and honor. Profession skill gain accepts
+whole-number multipliers from 1×–10×. Applying a rate safely restarts the
+worldserver; it does not unlock progression brackets or raise the bot level cap.
 
 ## 6. Connect a WoW client
 
