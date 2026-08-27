@@ -1,6 +1,6 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.7
+**Document version:** 1.8
 
 **Status:** runnable alpha
 
@@ -228,6 +228,12 @@ dialogue tuning; and Ollama model installation/selection. Export,
 relationships/promises/goals, latency analytics, and progression workflows
 remain future work. Progression controls are deliberately absent until backup
 verification and restore testing are automated.
+
+The repository also includes an optional 3.3.5a client addon, Party Commander.
+It sends standard Playerbots commands through party or raid chat from direct
+user clicks or configured key bindings. It can separately address a named
+personal companion or healer-role bots, but it has no Soulforge, LLM, Docker,
+or server-administration authority.
 
 Bridge requests require a shared-secret signature, timestamp window,
 nonce/replay protection, size limits, and strict schema validation. MariaDB,
@@ -475,3 +481,18 @@ character.
 **Consequence:** Startup applies the pinned module schema through a guarded
 migration. Transmog, solo-scaling, and account-wide-convenience modules remain
 out of scope.
+
+### 2026-08-27 — Provide a controller-sized party commander for human tanks
+
+**Decision:** Bundle an optional WoW 3.3.5a addon with five Playerbots actions:
+follow, hold, attack, rebuff, and flee. It selects party or raid automatically;
+mouse modifiers can address `Wife` or healer-role bots, while controller users
+cycle among those three scopes with one explicit binding.
+
+**Reason:** A human tank needs immediate, deliberate group control without a
+large controller binding surface or granting Soulforge's social layer gameplay
+authority.
+
+**Consequence:** The addon is installed only in a user's legal local WoW client,
+never changes bindings automatically, and remains limited to user-initiated
+chat commands supported by Playerbots.

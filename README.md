@@ -98,7 +98,9 @@ gameplay action—the language model is only a social layer.
 
 For the complete walkthrough, troubleshooting, IP-change procedure, and first
 soul instructions, read [Getting Started](docs/GETTING_STARTED.md). Party and
-raid macros are in [Playerbots Party Hotkeys](docs/PLAYERBOT_HOTKEYS.md).
+raid macros are in [Playerbots Party Hotkeys](docs/PLAYERBOT_HOTKEYS.md). A
+controller-sized 3.3.5a tank control panel is in
+[Party Commander](docs/PARTY_COMMANDER_ADDON.md).
 
 ## Repository map
 

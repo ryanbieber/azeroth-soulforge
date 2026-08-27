@@ -19,7 +19,9 @@ required=(
   scripts/validate-skill-inference.py
   docs/GETTING_STARTED.md docs/PLAYERBOT_HOTKEYS.md site/index.html site/assets/styles.css
   site/assets/app.js site/.nojekyll .github/workflows/pages.yml
-  scripts/validate-pages.py
+  scripts/validate-pages.py scripts/validate-party-commander.py
+  addons/PartyCommander/PartyCommander.toc addons/PartyCommander/PartyCommander.lua
+  addons/PartyCommander/Bindings.xml docs/PARTY_COMMANDER_ADDON.md
 )
 for path in "${required[@]}"; do
   test -f "$path" || { echo "missing required file: $path" >&2; exit 1; }
@@ -53,7 +55,9 @@ PYTHONDONTWRITEBYTECODE=1 \
   python3 -m unittest discover -s control-agent/tests -v
 
 PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile \
-  scripts/validate-skill-inference.py
+  scripts/validate-skill-inference.py scripts/validate-party-commander.py
+
+python3 scripts/validate-party-commander.py
 
 python3 scripts/validate-pages.py
 

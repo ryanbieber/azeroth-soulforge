@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: Party Commander
+## Notes: Controller-sized Playerbot commands for parties and raids.
+## Author: Azeroth Soulforge
+## Version: 1.0.0
+## SavedVariables: PartyCommanderDB
+
+PartyCommander.lua
+Bindings.xml
