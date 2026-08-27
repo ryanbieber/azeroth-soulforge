@@ -451,8 +451,8 @@ Progression brackets and Playerbot level caps remain independent safety gates.
 
 ### 2026-08-27 — Allow large staged random-bot populations
 
-**Decision:** Permit 0–2,000 random bots through the validated dashboard while
-retaining a conservative first-run default.
+**Decision:** Permit 0–2,000 random bots through the validated dashboard and
+default new installations to 500 random bots.
 
 **Reason:** Capable hosts can create a busier world, and random population bots
 do not need Soulforge profiles or LLM inference.

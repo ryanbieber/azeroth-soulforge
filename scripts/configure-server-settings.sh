@@ -52,8 +52,8 @@ if test -f "$MARKER"; then
   exit 0
 fi
 
-set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MinRandomBots "${SOULFORGE_RANDOM_BOTS:-50}"
-set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MaxRandomBots "${SOULFORGE_RANDOM_BOTS:-50}"
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MinRandomBots "${SOULFORGE_RANDOM_BOTS:-500}"
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MaxRandomBots "${SOULFORGE_RANDOM_BOTS:-500}"
 set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MaxAddedBots "${SOULFORGE_MAX_ADDED_BOTS:-40}"
 set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.RandomBotMaxLevel 19
 set_config runtime/azerothcore/etc/modules/progression_system.conf ProgressionSystem.Bracket_0 1
