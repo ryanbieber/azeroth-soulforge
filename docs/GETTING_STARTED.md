@@ -108,6 +108,14 @@ reputation, item loot, money drops, and honor. Profession skill gain accepts
 whole-number multipliers from 1×–10×. Applying a rate safely restarts the
 worldserver; it does not unlock progression brackets or raise the bot level cap.
 
+Under **Settings → Realm**, **New character boost level** controls the starting
+level for characters created after you apply the setting. Set it to `55` when
+you want new alts ready to begin endgame quest chains quickly. It applies to
+normal and heroic classes, restarts the worldserver, and does not change
+existing characters, gear, weapon skills, professions, flight paths, or
+attunements. Return it to `1` whenever you want the ordinary starting
+experience again.
+
 Under **Settings → Auction house**, choose a dedicated unused character before
 enabling the seller or buyer. Create that alt normally in the WoW client, log
 it out, refresh the dashboard, and select it. Do not play the assigned

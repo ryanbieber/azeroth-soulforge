@@ -114,6 +114,21 @@ class ControlSettingsTests(unittest.TestCase):
             finally:
                 control.CONFIG_DIR = original
 
+    def test_new_character_level_updates_normal_and_heroic_starts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            original = control.CONFIG_DIR
+            control.CONFIG_DIR = Path(directory)
+            try:
+                path = control.CONFIG_DIR / "worldserver.conf"
+                path.write_text("StartPlayerLevel = 1\nStartHeroicPlayerLevel = 55\n", encoding="utf-8")
+                control.update_setting("new_character_level", 55)
+                self.assertEqual(control.read_config_value("worldserver.conf", "StartPlayerLevel", 1), 55)
+                self.assertEqual(control.read_config_value("worldserver.conf", "StartHeroicPlayerLevel", 1), 55)
+                with self.assertRaisesRegex(ValueError, "new_character_level must be between"):
+                    control.update_setting("new_character_level", 81)
+            finally:
+                control.CONFIG_DIR = original
+
     def test_roster_flags_personal_characters_as_player_added_companions(self) -> None:
         with patch.object(
             control,

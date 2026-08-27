@@ -20,6 +20,7 @@ SETTING_KEYS = {
     "random_bots": ("modules/playerbots.conf", ("AiPlayerbot.MinRandomBots", "AiPlayerbot.MaxRandomBots"), 0, 2000),
     "max_added_bots": ("modules/playerbots.conf", ("AiPlayerbot.MaxAddedBots",), 1, 80),
     "player_limit": ("worldserver.conf", ("PlayerLimit",), 1, 1000),
+    "new_character_level": ("worldserver.conf", ("StartPlayerLevel", "StartHeroicPlayerLevel"), 1, 80),
 }
 RATE_SETTING_KEYS = {
     "xp_rate": (

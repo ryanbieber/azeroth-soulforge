@@ -134,6 +134,7 @@ components:
         realm_type: {type: string, enum: [normal, pvp, rp, rp_pvp]}
         random_bots: {type: integer, minimum: 0, maximum: 2000}
         max_added_bots: {type: integer, minimum: 1, maximum: 80}
+        new_character_level: {type: integer, minimum: 1, maximum: 80, description: Starting level for newly created normal and heroic characters; does not modify existing characters.}
         player_limit: {type: integer, minimum: 1, maximum: 1000}
         xp_rate: {type: number, minimum: 0.1, maximum: 10}
         reputation_rate: {type: number, minimum: 0.1, maximum: 10}
@@ -154,7 +155,7 @@ components:
       allOf:
         - {$ref: "#/components/schemas/ServerSettingsUpdate"}
         - type: object
-          required: [realm_name, realm_type, random_bots, max_added_bots, player_limit, xp_rate, reputation_rate, loot_rate, money_rate, honor_rate, profession_skill_rate, auction_house_character_guid, auction_house_seller, auction_house_buyer, auction_house_items_per_cycle, chat_model, souls_enabled, temperature, max_tokens]
+          required: [realm_name, realm_type, random_bots, max_added_bots, new_character_level, player_limit, xp_rate, reputation_rate, loot_rate, money_rate, honor_rate, profession_skill_rate, auction_house_character_guid, auction_house_seller, auction_house_buyer, auction_house_items_per_cycle, chat_model, souls_enabled, temperature, max_tokens]
   securitySchemes:
     adminSession:
       type: apiKey

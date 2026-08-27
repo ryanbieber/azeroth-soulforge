@@ -79,8 +79,9 @@ make verify    # run repository tests and contract checks
 ```
 
 The dashboard can start, stop, and restart the game services; configure the
-realm name and Normal/PvP/RP/RP-PvP type; tune Playerbot population and bounded
-XP, reputation, loot, money, honor, and profession rates; forge character
+realm name and Normal/PvP/RP/RP-PvP type; choose a 1–80 starting level for new
+characters; tune Playerbot population and bounded XP, reputation, loot, money,
+honor, and profession rates; forge character
 profiles; edit each
 character’s `SKILL.md`; inspect or remove memories; and install or select any
 Ollama model the host can support. Playerbots remains responsible for every

@@ -1,6 +1,6 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 1.9
+**Document version:** 2.0
 
 **Status:** runnable alpha
 
@@ -221,8 +221,8 @@ The dashboard currently supports Playerbot roster discovery with player-added
 companions flagged ahead of random world bots; soul seeding,
 editing, pausing, and per-character SKILL.md authoring; memory
 inspection/deletion; service health and game-server
-lifecycle; realm name and type, bot population, player-limit, bounded gameplay
-rate settings; optional dedicated-character auction-house buyer/seller
+lifecycle; realm name and type, bot population, new-character boost level,
+player-limit, bounded gameplay rate settings; optional dedicated-character auction-house buyer/seller
 automation; global
 dialogue tuning; and Ollama model installation/selection. Export,
 relationships/promises/goals, latency analytics, and progression workflows
@@ -509,3 +509,18 @@ or maintaining a client addon.
 force them onto characters. Creating them as General Macros makes them
 available to every character on that WoW account; players still choose the
 action-bar and controller bindings.
+
+### 2026-08-27 — Expose a new-character boost level
+
+**Decision:** Add a validated 1–80 dashboard setting that writes both
+`StartPlayerLevel` and `StartHeroicPlayerLevel` for characters created after it
+is applied.
+
+**Reason:** The owner wants fresh alts to reach endgame quest chains quickly
+while retaining those quest chains, gearing, attunements, and raid preparation
+as gameplay.
+
+**Consequence:** The setting restarts the worldserver, never edits existing
+characters, and does not grant gear, skills, professions, reputations, flight
+paths, or progression unlocks. `55` is documented as the practical raid-prep
+quest starting point; `1` remains the default.

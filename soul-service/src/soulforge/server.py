@@ -760,7 +760,7 @@ class SoulHandler(BaseHTTPRequestHandler):
                 self.server.max_tokens = tokens
                 local["max_tokens"] = str(tokens)
             remote_keys = {
-                "realm_name", "realm_type", "random_bots", "max_added_bots", "player_limit",
+                "realm_name", "realm_type", "random_bots", "max_added_bots", "player_limit", "new_character_level",
                 "xp_rate", "reputation_rate", "loot_rate", "money_rate", "honor_rate",
                 "profession_skill_rate",
                 "auction_house_character_guid", "auction_house_seller", "auction_house_buyer",
