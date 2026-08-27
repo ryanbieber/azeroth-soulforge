@@ -114,6 +114,19 @@ class ControlSettingsTests(unittest.TestCase):
             finally:
                 control.CONFIG_DIR = original
 
+    def test_roster_flags_personal_characters_as_player_added_companions(self) -> None:
+        with patch.object(
+            control,
+            "mysql",
+            return_value=(
+                "101\tWorldbot\t19\t1\t1\t1\trndbot1\t0\n"
+                "202\tWife\t1\t2\t7\t0\tCARNufex\t1\n"
+            ),
+        ):
+            bots = control.list_bots()
+        self.assertFalse(bots[0]["player_added"])
+        self.assertTrue(bots[1]["player_added"])
+
     def test_auction_house_requires_a_character_before_enabling(self) -> None:
         with self.assertRaisesRegex(ValueError, "choose a dedicated"):
             control.update_auction_house_settings({

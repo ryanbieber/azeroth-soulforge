@@ -78,11 +78,14 @@ function Bots({ csrf, notify, souls, refreshSouls }) {
   useEffect(()=>{api('/admin/v1/bots').then(x=>setBots(x.bots)).catch(e=>notify(e.message,true))},[])
   const soulKeys = useMemo(()=>new Set(souls.map(s=>`${s.realm_id}:${s.bot_guid}`)),[souls])
   const shown = bots.filter(b=>`${b.name} ${CLASS_NAMES[b.class]||''}`.toLowerCase().includes(search.toLowerCase()))
+  const companions = shown.filter(bot=>bot.player_added), worldBots = shown.filter(bot=>!bot.player_added)
   async function forge(bot){setBusy(bot.guid);try{await api('/admin/v1/souls',{method:'POST',body:{realm_id:'azeroth-soulforge',bot_guid:bot.guid,name:bot.name}},csrf);notify(`${bot.name}'s soul is ready`);refreshSouls()}catch(e){notify(e.message,true)}finally{setBusy('')}}
-  return <div className="page"><header className="page-head"><div><p className="eyebrow">Playerbot roster</p><h2>All companions</h2></div><span className="count">{bots.length} bots</span></header>
+  const card = bot=>{const forged=soulKeys.has(`azeroth-soulforge:${bot.guid}`);return <article className="bot-card" key={bot.guid}><div className={`portrait class-${bot.class}`}>{bot.name.slice(0,1)}</div><div className="bot-main"><div className="bot-title"><h3>{bot.name}</h3><span className={bot.online?'online-text':'muted'}>{bot.online?'Online':'Offline'}</span></div><p>Level {bot.level} {RACE_NAMES[bot.race]||'Unknown'} {CLASS_NAMES[bot.class]||'Adventurer'}</p><small className="role">{bot.player_added?'Player-added companion':'World population bot'}</small></div><button className={forged?'quiet':'primary'} disabled={forged||busy===bot.guid} onClick={()=>forge(bot)}>{forged?'Soul forged':'Forge soul'}</button></article>}
+  return <div className="page"><header className="page-head"><div><p className="eyebrow">Playerbot roster</p><h2>Companions &amp; world bots</h2></div><span className="count">{bots.length} bots</span></header>
     <div className="toolbar"><input placeholder="Search name or class…" value={search} onChange={e=>setSearch(e.target.value)}/></div>
-    {!bots.length && <section className="empty"><h3>No generated bots yet</h3><p>Playerbots creates its roster after the worldserver completes its first startup.</p></section>}
-    <div className="bot-grid">{shown.map(bot=>{const forged=soulKeys.has(`azeroth-soulforge:${bot.guid}`);return <article className="bot-card" key={bot.guid}><div className={`portrait class-${bot.class}`}>{bot.name.slice(0,1)}</div><div className="bot-main"><div className="bot-title"><h3>{bot.name}</h3><span className={bot.online?'online-text':'muted'}>{bot.online?'Online':'Offline'}</span></div><p>Level {bot.level} {RACE_NAMES[bot.race]||'Unknown'} {CLASS_NAMES[bot.class]||'Adventurer'}</p></div><button className={forged?'quiet':'primary'} disabled={forged||busy===bot.guid} onClick={()=>forge(bot)}>{forged?'Soul forged':'Forge soul'}</button></article>})}</div>
+    {!bots.length && <section className="empty"><h3>No bots yet</h3><p>Playerbots creates world bots after startup. Your own logged-out alts appear here as companions.</p></section>}
+    {!!companions.length&&<section className="panel"><div className="section-title"><h3>Player-added companions</h3><span>{companions.length} companion{companions.length===1?'':'s'}</span></div><div className="bot-grid">{companions.map(card)}</div></section>}
+    {!!worldBots.length&&<section className="panel"><div className="section-title"><h3>World population</h3><span>{worldBots.length} random bots</span></div><div className="bot-grid">{worldBots.map(card)}</div></section>}
   </div>
 }
 

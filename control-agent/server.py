@@ -269,11 +269,12 @@ def update_auction_house_settings(payload: dict[str, Any]) -> bool:
 
 def list_bots() -> list[dict[str, Any]]:
     query = """
-SELECT c.guid,c.name,c.level,c.race,c.class,c.online,a.username
+SELECT c.guid,c.name,c.level,c.race,c.class,c.online,a.username,
+       CASE WHEN LOWER(a.username) LIKE 'rndbot%' THEN 0 ELSE 1 END AS player_added
 FROM acore_characters.characters c
 JOIN acore_auth.account a ON a.id=c.account
-WHERE LOWER(a.username) LIKE 'rndbot%'
-ORDER BY c.name;
+WHERE LOWER(a.username) NOT LIKE 'addclass%'
+ORDER BY player_added DESC,c.name;
 """
     rows = []
     try:
@@ -282,9 +283,9 @@ ORDER BY c.name;
         return rows
     for line in output.splitlines():
         fields = line.split("\t")
-        if len(fields) != 7:
+        if len(fields) != 8:
             continue
-        guid, name, level, race, character_class, online, account = fields
+        guid, name, level, race, character_class, online, account, player_added = fields
         rows.append({
             "guid": guid,
             "name": name,
@@ -293,6 +294,7 @@ ORDER BY c.name;
             "class": int(character_class),
             "online": online == "1",
             "account": account,
+            "player_added": player_added == "1",
         })
     return rows
 

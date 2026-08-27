@@ -81,7 +81,7 @@ paths:
       responses: {"204": {description: Memory deleted}, "404": {description: Unknown memory}}
   /bots:
     get:
-      summary: List generated random Playerbot characters
+      summary: List Playerbots, flagging player-added companions separately from random world bots
       responses: {"200": {description: Playerbot roster}}
   /auction-house/characters:
     get:

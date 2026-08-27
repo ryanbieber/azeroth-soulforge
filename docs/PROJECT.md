@@ -217,7 +217,8 @@ host-administration boundary. It accepts only an internal bearer secret and an
 explicit operation allowlist; it exposes no arbitrary command, SQL, filesystem,
 or container API. The browser never receives any infrastructure secret.
 
-The dashboard currently supports Playerbot roster discovery; soul seeding,
+The dashboard currently supports Playerbot roster discovery with player-added
+companions flagged ahead of random world bots; soul seeding,
 editing, pausing, and per-character SKILL.md authoring; memory
 inspection/deletion; service health and game-server
 lifecycle; realm name and type, bot population, player-limit, bounded gameplay

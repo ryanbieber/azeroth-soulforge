@@ -121,6 +121,11 @@ in, and watch worldserver CPU and game latency before raising it again. Random
 population bots do not automatically receive Soulforge profiles or invoke the
 dialogue model.
 
+Your own normal-account characters appear first in the **All bots** roster with
+a **Player-added companion** flag; generated `rndbot` characters remain in the
+separate world-population section. This makes companions such as `Wife` easy to
+find and forge into souls without making every random world bot an LLM user.
+
 ## 6. Connect a WoW client
 
 On every client computer, locate the locale directory—for example `Data/enUS`
