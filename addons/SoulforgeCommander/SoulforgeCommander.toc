@@ -1,0 +1,7 @@
+## Interface: 30300
+## Title: Soulforge Commander
+## Notes: User-initiated GUI controls for a Playerbots dungeon group.
+## Author: Azeroth Soulforge contributors
+## Version: 1.0.0
+## SavedVariables: SoulforgeCommanderDB
+SoulforgeCommander.lua

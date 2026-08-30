@@ -9,7 +9,7 @@ description = "Local persistent social intelligence for AzerothCore Playerbots"
 requires-python = ">=3.11"
 license = {text = "GPL-2.0-only"}
 authors = [{name = "Azeroth Soulforge contributors"}]
-dependencies = []
+dependencies = ["cryptography>=41,<46"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

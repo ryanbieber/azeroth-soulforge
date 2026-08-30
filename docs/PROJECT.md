@@ -1,21 +1,21 @@
 # Azeroth Soulforge — Durable Project Specification
 
-**Document version:** 2.0
+**Document version:** 3.0
 
 **Status:** runnable alpha
 
-**Last reviewed:** 2026-08-27
+**Last reviewed:** 2026-08-29
 
 This document is the durable source of truth for the project. Code, contracts,
 operations, and milestone claims must agree with it.
 
 ## 1. Vision and success criteria
 
-Azeroth Soulforge enables a private solo/LAN AzerothCore realm in which one
-human builds a guild of roughly 40 named Playerbot companions. Each curated
-companion has a persistent simulated identity: personality, conversational
-voice, relationships, memories, promises, and goals that survive restarts and
-evolve from shared play.
+Azeroth Soulforge enables a private solo/LAN AzerothCore realm that begins with
+one immutable `w0rld` prompt. The prompt becomes canon for people, dialogue,
+relationships, rumors, and narrative plans. The owner enters a fresh staged-
+Vanilla realm with four automatically selected dungeon companions, lives in it
+at their own pace, and pauses it when they leave.
 
 The project uses *soul* as approachable product language for that continuity. It
 does not assert consciousness, sentience, inner experience, or literal life.
@@ -23,7 +23,8 @@ does not assert consciousness, sentience, inner experience, or literal life.
 The first complete release succeeds when:
 
 - A pinned AzerothCore Playerbots fork and module build reproducibly.
-- Forty curated companions can level, gear, group, and raid through Playerbots.
+- A role-balanced dungeon party is generated from available Playerbots, and
+  additional encountered bots can be promoted to deep-memory companions.
 - Humans can interact with souls through in-game chat and a local dashboard.
 - Meaningful events become attributable memories that survive restarts.
 - Slow or unavailable inference never stalls the world update loop or gameplay.
@@ -34,13 +35,14 @@ The first complete release succeeds when:
 ## 2. Scope and non-goals
 
 In scope: Linux source deployment for localhost or trusted LAN; AzerothCore
-3.3.5a with the required Playerbots fork; about 40 soulful guild bots; in-game
-chat; an authenticated LAN administration dashboard; local Ollama inference;
-and manual Vanilla-to-Wrath
-progression.
+3.3.5a with the required Playerbots fork; a prompted narrative world; deep-
+memory companions; shared population memory; in-game dialogue; an authenticated
+LAN dashboard; local Ollama plus owner-configured OpenAI, Anthropic, Gemini, and
+OpenAI-compatible inference; normalized usage accounting; and manual Vanilla-
+to-Wrath progression.
 
-Not in v1: a public internet realm, cloud inference, direct LLM gameplay
-control, claims of consciousness, voice chat, a custom client, or distribution
+Not in v1: a public internet realm, direct LLM gameplay control, generated game
+quests/rewards/content, claims of consciousness, voice chat, a custom client, or distribution
 of game assets, extracted data, and model weights.
 
 ## 3. Architecture and ownership
@@ -54,11 +56,11 @@ mod-soulbridge worker queue/outbox client
     | authenticated local HTTP
 Soul Service (Python HTTP service)
     |-- durable inbox and reply outbox
-    |-- identity, relationships, memory, retrieval
-    |-- inference scheduler and authenticated admin API
+    |-- prompted-world canon, narrative director, identity and memory
+    |-- provider routing, usage ledger and authenticated admin API
     |-- SQLite in WAL mode
     |
-Ollama chat and embedding APIs
+Ollama or owner-configured paid text APIs; local embeddings
 
 trusted LAN browser --HTTPS--> nginx gateway --> React assets/admin API
                                                   |
@@ -74,14 +76,15 @@ trusted LAN browser --HTTPS--> nginx gateway --> React assets/admin API
   disabled.
 - **mod-soulbridge** observes approved events and transports them. It contains
   no personality or memory policy.
-- **Soul Service** owns profiles, memory, relationships, prompts, inference,
-  dashboard behavior, and the durable outbox.
+- **Soul Service** owns immutable world canon, world time, narrative plans,
+  profiles, memory, relationships, provider routing, usage, prompts, dashboard
+  behavior, and the durable outbox.
 - **React dashboard** manages non-secret bot, soul, model, and server settings
   through same-origin administration APIs.
 - **Control Agent** is an internal-only, Docker-privileged allowlist for service
   state, game-server lifecycle, Playerbot roster queries, and selected configs.
-- **Ollama** performs local generation and embedding behind a replaceable
-  adapter and is never called from the game process.
+- **Provider adapters** perform generation behind a replaceable server-side
+  interface and are never called from the game process. Embeddings stay local.
 
 The C++ module must enqueue quickly and return. Dedicated worker code performs
 HTTP. Replies return through a world-thread-safe scheduler. No network,
@@ -163,8 +166,15 @@ transactional memory indexing, and the document is refreshed after profile or
 memory changes.
 
 Canonical facts cannot be rewritten by generated output. Relationship changes
-are bounded per event. Structured memory extraction may produce no memory for
-trivial interactions.
+are bounded per event. Each companion retains at most 60 recent raw chat
+messages. Exchanges enter a temporary 12-item world buffer; after eight, the
+director distills only durable promises, relationships, discoveries, decisions,
+and unresolved threads into shared memory. Successful compaction deletes the
+raw buffer, and trivial interactions may produce no durable memory at all. Raw
+event payloads retain at most seven days or 2,000 completed events; expired
+outbox rows are collected. The distilled non-canonical ledger retains the 400
+highest-importance recent facts while founding and narrative events are
+protected.
 
 Retrieval combines SQLite FTS keyword ranking with cosine similarity over local
 embeddings, then filters by soul, participants, phase, recency, importance, and
@@ -217,22 +227,19 @@ host-administration boundary. It accepts only an internal bearer secret and an
 explicit operation allowlist; it exposes no arbitrary command, SQL, filesystem,
 or container API. The browser never receives any infrastructure secret.
 
-The dashboard currently supports Playerbot roster discovery with player-added
-companions flagged ahead of random world bots; soul seeding,
-editing, pausing, and per-character SKILL.md authoring; memory
-inspection/deletion; service health and game-server
-lifecycle; realm name and type, bot population, new-character boost level,
-player-limit, bounded gameplay rate settings; optional dedicated-character auction-house buyer/seller
-automation; global
-dialogue tuning; and Ollama model installation/selection. Export,
-relationships/promises/goals, latency analytics, and progression workflows
-remain future work. Progression controls are deliberately absent until backup
-verification and restore testing are automated.
+The dashboard's Home page is the everyday control surface: prompted-world state,
+human presence, world playtime, Enter/Leave controls, service state, companion
+status, AI kill switch, active director/dialogue routes, normalized token usage,
+and estimated spend. World, Companions, AI Studio, Addon, and Advanced pages
+separate story continuity from infrequent administration. API credentials are
+encrypted at rest and never returned to the browser. Progression controls remain
+absent until backup verification and restore testing are automated.
 
-The repository documents controller-ready General WoW macros for standard
-Playerbots party and raid commands. They are client account data rather than
-server configuration: the owner creates them once as non-character-specific
-macros and maps their action-bar slots through their controller software.
+The repository ships Soulforge Commander, an optional 3.3.5a addon. The owner
+maps one key/controller button to a hold-to-open radial wheel, moves the mouse to
+select a Playerbots order, and releases to execute. The addon has no network or
+AI authority and every command remains user initiated. General macros remain a
+troubleshooting fallback.
 
 Bridge requests require a shared-secret signature, timestamp window,
 nonce/replay protection, size limits, and strict schema validation. MariaDB,
@@ -267,6 +274,9 @@ only when existing consumers remain safe.
 | Memory and relationships | Partial | Recent per-soul dialogue persists; richer model pending |
 | Ollama dialogue | Alpha | `qwen3.5:4b` local chat adapter implemented |
 | Dashboard | Alpha | Authenticated HTTPS React control plane and safe admin workflows |
+| Prompted fresh world | Alpha | Immutable seed, canon, dungeon group and narrative plans persist |
+| Provider routing and usage | Alpha | Local/paid adapters, kill switch and usage ledger pass tests |
+| Soulforge Commander | Alpha | Radial command addon packaged by the authenticated dashboard |
 | Public setup documentation | Complete | Beginner guide deploys through GitHub Pages |
 | Progression integration | Alpha | Initial level-19 phase configured; later unlock workflow pending |
 | Guild acceptance | Not started | Eight-hour, 40-soul soak criteria pass |
@@ -524,3 +534,66 @@ as gameplay.
 characters, and does not grant gear, skills, professions, reputations, flight
 paths, or progression unlocks. `55` is documented as the practical raid-prep
 quest starting point; `1` remains the default.
+
+### 2026-08-29 — Make one immutable prompt the root of a fresh world
+
+**Decision:** A new installation begins by converting one owner-written
+`w0rld` prompt into immutable structured canon, founding tensions, narrative
+plans, and four role-balanced companion profiles.
+
+**Reason:** The owner should feel that they are entering one coherent world,
+not managing unrelated bots and model settings.
+
+**Consequence:** Generated memories and plans may extend canon but never rewrite
+it. Alpha-era world migration is not a supported requirement; normal restarts
+of a forged world remain durable.
+
+### 2026-08-29 — Advance narrative time only during human play
+
+**Decision:** Aggregate non-bot presence controls world playtime. The realm
+auto-stops after the configurable grace period following the last human logout.
+
+**Reason:** Companions and plans must not progress ahead while the owner is away.
+
+**Consequence:** Wall-clock downtime triggers no catch-up. The control agent
+exposes only an allowlisted aggregate presence query.
+
+### 2026-08-29 — Compact conversation before it becomes world memory
+
+**Decision:** Raw companion chat is bounded and temporary. A periodic director
+pass promotes only durable facts into the shared world ledger.
+
+**Reason:** Greetings, command chatter, and repetition should neither inflate
+storage and prompts nor accidentally harden into world history.
+
+**Consequence:** Personal context keeps 60 messages, the pending world buffer
+keeps 12 exchanges, and compaction begins at eight. Failed or disabled inference
+cannot create unbounded growth because the temporary buffer still evicts old
+entries. Raw events retain at most seven days or 2,000 completed records, and
+the distilled non-canonical ledger is capped at 400 facts.
+
+### 2026-08-29 — Route director and dialogue through server-side provider profiles
+
+**Decision:** Support Ollama, OpenAI, Anthropic, Gemini, and generic OpenAI-
+compatible providers with separate director/dialogue routes, encrypted API
+keys, normalized usage, an optional paid cap, and a global kill switch.
+
+**Reason:** World creation may benefit from a stronger paid model while frequent
+dialogue remains affordable and private on local hardware.
+
+**Consequence:** Paid profiles are explicit opt-in data egress. Credentials are
+write-only to the browser, provider bills are authoritative, and reaching a cap
+falls back to local Ollama when available.
+
+### 2026-08-29 — Supersede macros with a hold-to-open radial commander
+
+**Decision:** Ship Soulforge Commander as a downloadable 3.3.5a addon. A mapped
+button opens a cursor-centered radial wheel; mouse direction selects an order
+and button release executes it.
+
+**Reason:** A visual command wheel is faster and more natural than typing chat
+commands or maintaining a bank of action-bar macros.
+
+**Consequence:** The addon still emits only user-initiated, supported Playerbots
+chat commands. It has no HTTP, credential, inference, or autonomous gameplay
+authority. The prior macro approach remains only a fallback.

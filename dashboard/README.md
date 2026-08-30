@@ -1,10 +1,9 @@
 # Dashboard
 
-The dashboard is a Vite-built React single-page application for trusted-LAN
-administration. It manages the Playerbot roster, forged soul profiles, memories,
-service lifecycle, validated realm settings (including new-character boost
-level), gameplay-rate settings, and locally installed Ollama models through
-same-origin `/admin/v1` APIs.
+The dashboard is a Vite-built React single-page application for the prompted
+fresh-world experience. Home combines world lifecycle, human presence, server
+health, AI state, usage, and spend; focused World, Companions, AI Studio, Addon,
+and Advanced pages keep routine play separate from administration.
 
 It never receives database, bridge, control-agent, Docker, or game-account
 credentials. Production assets are compiled into the Soul Service image.

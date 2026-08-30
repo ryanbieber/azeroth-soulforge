@@ -1,10 +1,10 @@
 # Azeroth Soulforge
 
-Azeroth Soulforge is a self-hosted AzerothCore 3.3.5a realm with Playerbots,
-staged progression, persistent companion profiles and memories, and local
-dialogue through Ollama. A password-protected React dashboard manages bots,
-souls, models, auction-house automation, and routine server settings from your
-trusted home network.
+Azeroth Soulforge is a self-hosted AzerothCore 3.3.5a realm that turns one
+`w0rld` prompt into immutable canon, a fresh staged-Vanilla setting, a generated
+dungeon group, persistent memories, and future narrative threads. A private
+React dashboard wakes and pauses the realm, routes local or paid AI, tracks
+usage, and keeps server administration out of the everyday path.
 
 > A Soulforge “soul” is a simulation of character continuity. It is not a claim
 > that a bot or language model is conscious or alive.
@@ -78,14 +78,21 @@ make account   # recreate or update the configured game account
 make verify    # run repository tests and contract checks
 ```
 
-The dashboard can start, stop, and restart the game services; configure the
+On first use, the dashboard asks for a world prompt, faction, and intended
+player role, then forges canon and four complementary companions from the
+available Playerbot roster. It can start, stop, and restart the game services; configure the
 realm name and Normal/PvP/RP/RP-PvP type; choose a 1–80 starting level for new
 characters; tune Playerbot population and bounded XP, reputation, loot, money,
 honor, and profession rates; forge character
 profiles; edit each
-character’s `SKILL.md`; inspect or remove memories; and install or select any
-Ollama model the host can support. Playerbots remains responsible for every
+character’s `SKILL.md`; inspect memories; and route Ollama, OpenAI, Anthropic,
+Gemini, or OpenAI-compatible models separately for world direction and dialogue.
+Playerbots remains responsible for every
 gameplay action—the language model is only a social layer.
+
+The dashboard also packages **Soulforge Commander**, a 3.3.5a addon with a
+hold-to-open radial command wheel. Map one button, move the mouse toward Follow,
+Stay, Flee, Attack, Tank Pull, Rebuff, or Reset, and release.
 
 ## Important safety notes
 
@@ -98,13 +105,14 @@ gameplay action—the language model is only a social layer.
   and soul data.
 
 For the complete walkthrough, troubleshooting, IP-change procedure, and first
-soul instructions, read [Getting Started](docs/GETTING_STARTED.md). Party and
-raid macros are in [Playerbots Party Hotkeys](docs/PLAYERBOT_HOTKEYS.md),
-including controller-ready general macros for a tank and shaman companion.
+world instructions, read [Getting Started](docs/GETTING_STARTED.md). The
+dashboard's Addon page provides Soulforge Commander; party and raid macros remain
+in [Playerbots Party Hotkeys](docs/PLAYERBOT_HOTKEYS.md) as a fallback.
 
 ## Repository map
 
 - `dashboard/` — React administration client.
+- `addons/SoulforgeCommander/` — hold-to-open radial Playerbots command wheel.
 - `soul-service/` — authenticated APIs, local inference, memory, and profiles.
 - `mod-soulbridge/` — asynchronous AzerothCore event/reply bridge.
 - `control-agent/` — internal allowlisted lifecycle/configuration boundary.

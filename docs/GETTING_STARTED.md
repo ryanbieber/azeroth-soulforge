@@ -52,6 +52,7 @@ Edit `.env` and replace every placeholder:
 | `SOULFORGE_BRIDGE_SECRET` | Authenticates game events to Soul Service |
 | `SOULFORGE_CONTROL_SECRET` | Authenticates the internal control agent; use at least 32 characters |
 | `SOULFORGE_ADMIN_PASSWORD` | Dashboard sign-in; use at least 12 characters and keep it unique |
+| `SOULFORGE_SECRETS_KEY` | Encrypts provider API keys at rest; use a unique random value of at least 24 characters |
 | `SOULFORGE_GAME_USERNAME` | WoW client login name |
 | `SOULFORGE_GAME_PASSWORD` | WoW 3.3.5a login password; 8–16 letters and numbers |
 | `SOULFORGE_LAN_IP` | Stable address of the server host |
@@ -98,10 +99,19 @@ The browser warning is expected because Soulforge generates a self-signed
 certificate for the private LAN address. Verify the address before accepting
 it, then sign in using `SOULFORGE_ADMIN_PASSWORD`.
 
-The dashboard manages game-service lifecycle, realm name and
-Normal/PvP/RP/RP-PvP type, bot population, bounded gameplay rates, soul
-profiles, memories, character `SKILL.md` guidance, and installed
-Ollama models. Do not publish this dashboard through a router or public tunnel.
+On a fresh install the dashboard opens **Forge your world**. Write one world
+prompt describing the tone, history, people, tensions, and social texture you
+want, choose your faction and combat role, then forge. Soulforge turns that
+seed into immutable canon, selects a complementary four-bot dungeon group, and
+plans spoiler-free future threads. Once it is ready, **Enter world** starts the
+game services. World time advances only while a human player is online.
+
+The dashboard also manages bot population, companions, gameplay rates, and AI
+routing. In **AI Studio**, local Ollama and paid OpenAI, Anthropic, Gemini, or
+compatible providers can be configured separately for world direction and
+companion dialogue. Provider keys are encrypted server-side and never returned
+to the browser. Set an optional monthly cap and use the global switch to stop
+new AI calls. Do not publish this dashboard through a router or public tunnel.
 
 Under **Settings → Gameplay rates**, multipliers from 0.1×–10× control XP,
 reputation, item loot, money drops, and honor. Profession skill gain accepts
@@ -147,11 +157,17 @@ Start `Wow.exe` directly rather than a modern retail launcher. Sign in with the
 game username and password from `.env`. No port-forwarding is necessary when
 the server and client are on the same LAN.
 
-## 7. Forge the first companion
+## 7. Command your companion party
 
-Open **Bots** in the dashboard to see generated Playerbots. Choose a named bot,
-forge its soul, and edit its canonical voice, values, and owner-editable
-character guidance. Each profile is materialized inside Soul Service as:
+Download **Soulforge Commander** from the dashboard and copy its folder into
+`Interface/AddOns` in the WoW client. Enable it at character selection, then map
+**Hold command wheel** under **Soulforge Commander** in WoW Key Bindings. Hold
+the mapped keyboard or controller button, aim the mouse toward Follow, Attack,
+Tank pull, Flee, Reset, Rebuff, or Stay, and release. Use the mouse wheel while
+aiming to select everyone, a role, or one companion; right-click cancels.
+
+The initial four companions receive deep-memory profiles automatically. Each
+profile is materialized inside Soul Service as:
 
 ```text
 /data/profiles/REALM/CharacterName/SKILL.md
@@ -159,21 +175,24 @@ character guidance. Each profile is materialized inside Soul Service as:
 
 The visible folder uses the current character name. Soulforge retains the
 immutable AzerothCore character GUID internally so renames do not merge or
-replace identities. Whisper the bot in game to exercise its local dialogue and
-memory flow.
+replace identities. Whisper a companion in game to exercise its dialogue and
+shared world-memory flow. Additional existing Playerbots can be promoted from
+**Companions**.
+
+Soulforge does not keep every line forever. A companion keeps 60 recent chat
+messages for continuity, while world conversations pass through a bounded
+temporary buffer. The director periodically promotes only durable facts,
+promises, relationships, discoveries, and decisions into the Chronicle.
 
 ## 8. Operate and protect the realm
 
 Use `make down` for a normal shutdown. Databases, souls, map data, configuration,
 and model files remain in named Docker volumes and are reused by `make up`.
 
-### Controller-ready party macros
+### Macro fallback
 
-Use the General macros in [Playerbots Party Hotkeys](PLAYERBOT_HOTKEYS.md) for
-Follow, Hold, Attack, Rebuff, and Flee. General macros are available to every
-character on the same WoW account; map their action-bar slots with your
-controller software. They default to the current party or raid, use Ctrl for
-`Wife`, and use Shift for healer-role bots.
+If an addon or binding cannot be used, the General macros in [Playerbots Party
+Hotkeys](PLAYERBOT_HOTKEYS.md) provide the same core orders.
 
 Run `make backup` before any progression change. Never remove Docker volumes
 unless you intend to delete the realm, and never attempt to reverse progression

@@ -11,6 +11,7 @@ required=(
   scripts/install-module-sql.sh
   contracts/openapi.yaml contracts/admin-openapi.yaml contracts/events.schema.json
   contracts/soul-export.schema.json soul-service/pyproject.toml
+  soul-service/src/soulforge/providers.py soul-service/src/soulforge/world.py
   soul-service/README.md mod-soulbridge/CMakeLists.txt
   mod-soulbridge/README.md mod-soulbridge/include.sh
   control-agent/Dockerfile control-agent/server.py dashboard/package-lock.json
@@ -20,6 +21,9 @@ required=(
   docs/GETTING_STARTED.md docs/PLAYERBOT_HOTKEYS.md site/index.html site/assets/styles.css
   site/assets/app.js site/.nojekyll .github/workflows/pages.yml
   scripts/validate-pages.py
+  addons/SoulforgeCommander/SoulforgeCommander.toc
+  addons/SoulforgeCommander/SoulforgeCommander.lua
+  addons/SoulforgeCommander/Bindings.xml
 )
 for path in "${required[@]}"; do
   test -f "$path" || { echo "missing required file: $path" >&2; exit 1; }
@@ -41,7 +45,7 @@ for marker in ("openapi: 3.1.0", "/v1/events:", "/v1/outbox:", "components:"):
         raise SystemExit(f"contracts/openapi.yaml: missing {marker!r}")
 
 admin = Path("contracts/admin-openapi.yaml").read_text(encoding="utf-8")
-for marker in ("openapi: 3.1.0", "/session:", "/server/settings:", "/models/pull:", "/skill:"):
+for marker in ("openapi: 3.1.0", "/session:", "/world/forge:", "/ai/providers:", "/addon/download:", "/server/settings:", "/models/pull:", "/skill:"):
     if marker not in admin:
         raise SystemExit(f"contracts/admin-openapi.yaml: missing {marker!r}")
 PY

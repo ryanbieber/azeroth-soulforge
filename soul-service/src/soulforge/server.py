@@ -12,6 +12,7 @@ from http.cookies import SimpleCookie
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hmac
+import io
 import json
 import mimetypes
 import os
@@ -27,6 +28,10 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import Request, urlopen
 from uuid import uuid4
+import zipfile
+
+from .providers import ProviderGateway, SecretCipher
+from .world import WorldRepository
 
 MAX_BODY = 64 * 1024
 
@@ -164,9 +169,20 @@ class SoulStore:
             "SELECT role, text FROM memories WHERE realm_id=? AND bot_guid=? ORDER BY id DESC LIMIT 12",
             (realm, guid),
         ).fetchall()[::-1]
+        world_row = connection.execute(
+            "SELECT id,canon_json FROM worlds WHERE realm_id=? AND active=1 LIMIT 1", (realm,)
+        ).fetchone()
+        world_memory_rows = [] if not world_row else connection.execute(
+            """SELECT kind,text FROM world_memories WHERE world_id=? AND redacted=0
+               ORDER BY id DESC LIMIT 12""", (world_row["id"],)
+        ).fetchall()[::-1]
         connection.commit()
         self.close(connection)
         memory_text = "\n".join(f"{row['role']}: {row['text']}" for row in memories) or "No prior memories yet."
+        canon_text = json.dumps(json.loads(world_row["canon_json"]), ensure_ascii=False) if world_row else "No world canon has been forged."
+        world_memory_text = "\n".join(
+            f"{row['kind']}: {row['text']}" for row in world_memory_rows
+        ) or "No shared world history yet."
         actor = event["actor"]
         prompt = (
             f"You are {name}, a persistent World of Warcraft companion—not an AI assistant. "
@@ -174,13 +190,15 @@ class SoulStore:
             f"Values: {profile['values_text']}. Stay in character, never claim consciousness, "
             "never issue gameplay commands, and answer in at most 3 short sentences.\n"
             f"Your character skill document:\n{guidance}\n"
+            f"Immutable world canon:\n{canon_text}\n"
+            f"Shared world history:\n{world_memory_text}\n"
             f"Recent memories:\n{memory_text}\n"
             f"{actor['name']} says in {event['channel']}: {event['text']}"
         )
         self._materialize_skill(realm, guid)
         return realm, guid, prompt
 
-    def complete(self, event: dict[str, Any], reply: str) -> None:
+    def complete(self, event: dict[str, Any], reply: str) -> str | None:
         soul = event["participants"][0]
         realm, guid = event["realm_id"], str(soul["guid"])
         now = utc_now()
@@ -195,6 +213,13 @@ class SoulStore:
             (realm, guid, reply[:2048], now),
         )
         connection.execute(
+            """DELETE FROM memories WHERE id IN (
+                 SELECT id FROM memories WHERE realm_id=? AND bot_guid=?
+                 ORDER BY id DESC LIMIT -1 OFFSET 60
+               )""",
+            (realm, guid),
+        )
+        connection.execute(
             """INSERT OR IGNORE INTO outbox
                (reply_id, source_event_id, realm_id, bot_guid, recipient_guid, channel,
                 text, created_at, expires_at, trace_id)
@@ -203,9 +228,68 @@ class SoulStore:
              reply[:1024], now, expires, event["trace"]["trace_id"]),
         )
         connection.execute("UPDATE events SET status='complete' WHERE event_id=?", (event["event_id"],))
+        raw_cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).replace(
+            microsecond=0
+        ).isoformat().replace("+00:00", "Z")
+        connection.execute(
+            "DELETE FROM events WHERE status='complete' AND created_at < ?", (raw_cutoff,)
+        )
+        connection.execute(
+            """DELETE FROM events WHERE event_id IN (
+                 SELECT event_id FROM events WHERE status='complete'
+                 ORDER BY created_at DESC LIMIT -1 OFFSET 2000
+               )"""
+        )
+        connection.execute(
+            "DELETE FROM outbox WHERE expires_at <= ? OR (acknowledged_at IS NOT NULL AND created_at < ?)",
+            (now, raw_cutoff),
+        )
+        world = connection.execute(
+            "SELECT id FROM worlds WHERE realm_id=? AND active=1 LIMIT 1", (realm,)
+        ).fetchone()
+        compact_world_id = None
+        if world:
+            actor_name = str(event["actor"].get("name", "A traveler"))[:24]
+            soul_name = str(soul.get("name", "A companion"))[:24]
+            shared = f"{actor_name} said: {event['text'][:700]} {soul_name} answered: {reply[:700]}"
+            connection.execute(
+                "INSERT INTO world_memory_candidates(world_id,text,created_at) VALUES(?,?,?)",
+                (world["id"], shared, now),
+            )
+            connection.execute(
+                """DELETE FROM world_memory_candidates WHERE id IN (
+                     SELECT id FROM world_memory_candidates WHERE world_id=?
+                     ORDER BY id DESC LIMIT -1 OFFSET 12
+                   )""",
+                (world["id"],),
+            )
+            count = connection.execute(
+                "SELECT COUNT(*) AS count FROM world_memory_candidates WHERE world_id=?",
+                (world["id"],),
+            ).fetchone()["count"]
+            if count >= 8:
+                compact_world_id = world["id"]
         connection.commit()
         self.close(connection)
         self._materialize_skill(realm, guid)
+        return compact_world_id
+
+    def enqueue_proactive(self, source_id: str, realm: str, bot_guid: str,
+                          recipient_guid: str, text: str) -> None:
+        now = utc_now()
+        expires = (datetime.now(timezone.utc) + timedelta(minutes=15)).replace(
+            microsecond=0
+        ).isoformat().replace("+00:00", "Z")
+        connection = self.connect()
+        connection.execute(
+            """INSERT OR IGNORE INTO outbox
+               (reply_id,source_event_id,realm_id,bot_guid,recipient_guid,channel,text,
+                created_at,expires_at,trace_id) VALUES(?,?,?,?,?,'whisper',?,?,?,?)""",
+            (str(uuid4()), source_id, realm, bot_guid, recipient_guid, text[:1024],
+             now, expires, str(uuid4())),
+        )
+        connection.commit()
+        self.close(connection)
 
     def pending(self, realm: str, limit: int) -> list[dict[str, Any]]:
         connection = self.connect()
@@ -470,36 +554,205 @@ class SoulforgeServer(ThreadingHTTPServer):
         self.control_url = os.environ.get("SOULFORGE_CONTROL_URL", "http://control-agent:8770").rstrip("/")
         self.control_secret = os.environ.get("SOULFORGE_CONTROL_SECRET", "test-control-secret")
         self.dashboard_dir = Path(os.environ.get("SOULFORGE_DASHBOARD_DIR", "/app/dashboard"))
+        self.addon_dir = Path(os.environ.get("SOULFORGE_ADDON_DIR", "/app/addons/SoulforgeCommander"))
+        master_key = os.environ.get("SOULFORGE_SECRETS_KEY") or (
+            f"development-only:{admin_password}:{secret}"
+        )
+        self.provider_gateway = ProviderGateway(SecretCipher(master_key))
+        self.worlds = WorldRepository(store, self.ollama_url, self.model)
+        self.ai_enabled = self.worlds.ai_state()["enabled"]
         self.login_attempts: dict[str, list[float]] = {}
         self.login_lock = Lock()
         self.jobs: Queue[dict[str, Any]] = Queue(maxsize=2048)
+        self.humans_online = 0
+        self._last_presence_tick = time.monotonic()
+        self._empty_since: float | None = None
+        self._auto_stop_fired = False
         if start_worker:
             Thread(target=self._worker, daemon=True, name="soulforge-inference").start()
+            Thread(target=self._presence_monitor, daemon=True, name="soulforge-presence").start()
 
     def _worker(self) -> None:
         while True:
-            event = self.jobs.get()
+            job = self.jobs.get()
             try:
-                if not self.souls_enabled:
-                    continue
-                prompt_data = self.store.build_prompt(event)
-                if prompt_data is None:
-                    continue
-                _, _, prompt = prompt_data
-                body = json.dumps({
-                    "model": self.model, "stream": False, "think": False,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "options": {"temperature": self.temperature, "num_predict": self.max_tokens},
-                }).encode()
-                request = Request(f"{self.ollama_url}/api/chat", data=body, headers={"Content-Type": "application/json"})
-                with urlopen(request, timeout=120) as response:
-                    reply = json.load(response)["message"]["content"].strip()
-                if reply:
-                    self.store.complete(event, reply)
+                if job.get("kind") == "world_forge":
+                    self._forge_world(job)
+                elif job.get("kind") == "director_event":
+                    self._director_event(job)
+                elif job.get("kind") == "memory_compaction":
+                    self._compact_world_memory(job["world_id"])
+                else:
+                    self._dialogue(job["event"])
             except Exception as error:  # Stay silent in game when inference is unavailable.
-                print(f"inference failed for {event.get('event_id')}: {error}", flush=True)
+                if job.get("kind") == "world_forge":
+                    self.worlds.update_job(job["job_id"], "failed", "The forge cooled", error=str(error))
+                elif job.get("kind") == "director_event":
+                    self.worlds.release_plan(job["plan"]["id"])
+                print(f"inference failed for {job.get('job_id') or job.get('event', {}).get('event_id')}: {error}", flush=True)
             finally:
                 self.jobs.task_done()
+
+    def _route_generation(self, purpose: str, prompt: str) -> str:
+        if not self.ai_enabled:
+            raise RuntimeError("AI is disabled by the kill switch")
+        route = self.worlds.routes()[purpose]
+        profile = self.worlds.provider(route["provider_id"], include_secret=True)
+        if not profile or not profile["enabled"]:
+            raise RuntimeError(f"the {purpose} provider is unavailable")
+        if not self.worlds.paid_budget_available(profile):
+            fallback = self.worlds.provider("ollama-local", include_secret=True)
+            if not fallback or not fallback["enabled"]:
+                raise RuntimeError("the paid AI cap was reached and local fallback is unavailable")
+            profile = fallback
+            route = {**route, "provider_id": "ollama-local"}
+        started = time.monotonic()
+        try:
+            result = self.provider_gateway.generate(
+                profile, route["model"], prompt, float(route["temperature"]), int(route["max_tokens"])
+            )
+            latency = int((time.monotonic() - started) * 1000)
+            if not self.ai_enabled:
+                raise RuntimeError("AI was disabled while the response was in flight")
+            self.worlds.record_usage(purpose, profile, route["model"], result.usage, latency, True)
+            return result.text
+        except Exception as error:
+            latency = int((time.monotonic() - started) * 1000)
+            self.worlds.record_usage(purpose, profile, route["model"], {}, latency, False,
+                                     type(error).__name__)
+            raise
+
+    def _dialogue(self, event: dict[str, Any]) -> None:
+        if not self.ai_enabled:
+            return
+        prompt_data = self.store.build_prompt(event)
+        if prompt_data is None:
+            return
+        _, _, prompt = prompt_data
+        reply = self._route_generation("dialogue", prompt)
+        if reply and self.ai_enabled:
+            world_id = self.store.complete(event, reply)
+            if world_id:
+                self.jobs.put_nowait({"kind": "memory_compaction", "world_id": world_id})
+
+    def _compact_world_memory(self, world_id: str) -> None:
+        candidates = self.worlds.memory_candidates(world_id)
+        if not candidates:
+            return
+        world = self.worlds.active_world()
+        if not world or world["id"] != world_id:
+            return
+        prompt = (
+            "Distill these recent roleplay exchanges into durable world memory. Keep only facts that "
+            "could matter later: promises, relationships, discoveries, decisions, unresolved fears, "
+            "or changes in belief. Discard greetings, jokes, repetition, commands, and casual chatter. "
+            "Never alter immutable canon. Return strict JSON as {\"memories\":[{\"kind\":\"relationship\","
+            "\"text\":\"one self-contained fact\",\"importance\":3}]}; return an empty array when nothing "
+            "deserves long-term memory. Use at most six concise memories.\n"
+            f"Canon: {json.dumps(world['canon'], ensure_ascii=False)}\n"
+            f"Existing durable memory: {json.dumps(self.worlds.memories(20), ensure_ascii=False)}\n"
+            f"Temporary exchanges: {json.dumps(candidates, ensure_ascii=False)}"
+        )
+        result = self._json_object(self._route_generation("director", prompt), require_premise=False)
+        memories = result.get("memories", [])
+        if not isinstance(memories, list):
+            raise ValueError("memory compactor returned invalid memories")
+        self.worlds.finish_memory_compaction(
+            world_id, [int(item["id"]) for item in candidates],
+            [item for item in memories if isinstance(item, dict)],
+        )
+
+    def _forge_world(self, job: dict[str, Any]) -> None:
+        job_id, request = job["job_id"], job["request"]
+        self.worlds.update_job(job_id, "running", "Reading the w0rld seed")
+        bots = self.control("GET", "/v1/bots").get("bots", [])
+        prompt = (
+            "Create an immutable narrative canon for a private World of Warcraft 3.3.5 realm opening "
+            "in a fresh Vanilla phase. AI controls only identity, relationships, dialogue, rumors, and "
+            "story beats; never invent gameplay rewards, quests, or commands. Return strict JSON with "
+            "keys premise, tone, social_rules, regional_flavor, factions, dialogue_guidance, taboos, "
+            "themes, starting_tensions (array), initial_plans (array of title, hint, after_played_minutes), "
+            "and companion_profiles (array of bot_guid, archetype, voice, values). Base companion profiles "
+            "only on these available character facts:\n"
+            f"{json.dumps(bots[:200], ensure_ascii=False)}\n"
+            f"Faction: {request['faction']}; player role: {request['player_role']}.\n"
+            f"W0RLD PROMPT:\n{request['seed_prompt']}"
+        )
+        self.worlds.update_job(job_id, "running", "Shaping canon and companions")
+        text = self._route_generation("director", prompt)
+        canon = self._json_object(text)
+        profiles = canon.pop("companion_profiles", [])
+        self.worlds.update_job(job_id, "running", "Binding the dungeon group")
+        world = self.worlds.activate_world(request, canon, bots, profiles)
+        self.worlds.update_job(job_id, "complete", "Your world is ready", result={"world": world})
+
+    def _director_event(self, job: dict[str, Any]) -> None:
+        world, plan = self.worlds.active_world(), job["plan"]
+        if not world:
+            return
+        memories = self.worlds.memories(30)
+        prompt = (
+            "Write one short in-world whisper, no more than three sentences, through which a trusted "
+            "companion naturally reveals this emerging story beat. Never mention AI, prompts, servers, "
+            "or future plans. Do not issue gameplay commands or promise rewards.\n"
+            f"Canon: {json.dumps(world['canon'], ensure_ascii=False)}\n"
+            f"Recent world memories: {json.dumps(memories, ensure_ascii=False)}\n"
+            f"Story beat: {json.dumps(plan, ensure_ascii=False)}"
+        )
+        text = self._route_generation("director", prompt)
+        if text and self.ai_enabled:
+            self.store.enqueue_proactive(plan["id"], world["realm_id"], job["bot_guid"],
+                                         job["recipient_guid"], text)
+            self.worlds.finish_plan(plan["id"], f"{plan['title']}: {text}")
+
+    @staticmethod
+    def _json_object(text: str, require_premise: bool = True) -> dict[str, Any]:
+        candidate = text.strip()
+        if candidate.startswith("```"):
+            candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE)
+        start, end = candidate.find("{"), candidate.rfind("}")
+        if start < 0 or end <= start:
+            raise ValueError("director did not return a JSON canon")
+        value = json.loads(candidate[start:end + 1])
+        if not isinstance(value, dict) or (require_premise and not str(value.get("premise", "")).strip()):
+            raise ValueError("director returned an incomplete canon")
+        return value
+
+    def _presence_monitor(self) -> None:
+        while True:
+            try:
+                now = time.monotonic()
+                payload = self.control("GET", "/v1/presence")
+                count = max(int(payload.get("humans_online", 0)), 0)
+                elapsed = int(now - self._last_presence_tick) if count > 0 and self.humans_online > 0 else 0
+                self.worlds.record_presence(count, elapsed)
+                if count > 0:
+                    self._empty_since = None
+                    self._auto_stop_fired = False
+                elif self.humans_online > 0:
+                    self._empty_since = now
+                self.humans_online = count
+                self._last_presence_tick = now
+                if count > 0 and self.ai_enabled:
+                    plan = self.worlds.claim_due_plan()
+                    companions = self.worlds.companions()
+                    players = payload.get("players") or []
+                    if plan and companions and players:
+                        self.jobs.put_nowait({
+                            "kind": "director_event", "plan": plan,
+                            "bot_guid": str(companions[0]["bot_guid"]),
+                            "recipient_guid": str(players[0]["guid"]),
+                        })
+                    elif plan:
+                        self.worlds.release_plan(plan["id"])
+                grace = self.worlds.ai_state()["auto_stop_minutes"]
+                if (grace and self._empty_since is not None and not self._auto_stop_fired
+                        and now - self._empty_since >= grace * 60):
+                    self.control("POST", "/v1/actions/stop", {})
+                    self._auto_stop_fired = True
+            except Exception as error:
+                print(f"presence monitor unavailable: {error}", flush=True)
+            time.sleep(30)
 
     def control(self, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         body = json.dumps(payload or {}, separators=(",", ":")).encode() if method != "GET" else None
@@ -550,6 +803,57 @@ class SoulHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/admin/v1/souls":
             if self._admin_session():
                 self._json(HTTPStatus.OK, {"souls": self.server.store.souls()})
+        elif parsed.path == "/admin/v1/home":
+            if not self._admin_session():
+                return
+            try:
+                control = self.server.control("GET", "/v1/status")
+            except RuntimeError as error:
+                control = {"services": [], "control_error": str(error)}
+            self._json(HTTPStatus.OK, {
+                "world": self.server.worlds.active_world(),
+                "companions": self.server.worlds.companions(),
+                "rumors": self.server.worlds.rumors()[:3],
+                "ai": self.server.worlds.ai_state(),
+                "routes": self.server.worlds.routes(),
+                "usage": self.server.worlds.usage_summary(),
+                **control,
+            })
+        elif parsed.path == "/admin/v1/world":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, {"world": self.server.worlds.active_world()})
+        elif parsed.path == "/admin/v1/world/chronicle":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, {"memories": self.server.worlds.memories()})
+        elif parsed.path == "/admin/v1/world/rumors":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, {"rumors": self.server.worlds.rumors()})
+        elif parsed.path == "/admin/v1/world/companions":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, {"companions": self.server.worlds.companions()})
+        elif parsed.path.startswith("/admin/v1/jobs/"):
+            if not self._admin_session():
+                return
+            job = self.server.worlds.job(parsed.path.rsplit("/", 1)[-1])
+            if job:
+                self._json(HTTPStatus.OK, job)
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+        elif parsed.path == "/admin/v1/ai/providers":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, {"providers": self.server.worlds.providers()})
+        elif parsed.path == "/admin/v1/ai/routing":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, {"routes": self.server.worlds.routes()})
+        elif parsed.path == "/admin/v1/ai/state":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, self.server.worlds.ai_state())
+        elif parsed.path == "/admin/v1/ai/usage":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, self.server.worlds.usage_summary())
+        elif parsed.path == "/admin/v1/addon/download":
+            if self._admin_session():
+                self._addon_download()
         elif parsed.path.startswith("/admin/v1/souls/") and parsed.path.endswith("/skill"):
             if not self._admin_session():
                 return
@@ -620,7 +924,7 @@ class SoulHandler(BaseHTTPRequestHandler):
                 return
             status = self.server.store.accept(event, body.decode())
             if status == "accepted":
-                self.server.jobs.put_nowait(event)
+                self.server.jobs.put_nowait({"kind": "dialogue", "event": event})
             self._json(HTTPStatus.ACCEPTED, {"event_id": event["event_id"], "status": status})
         elif self.path.startswith("/v1/outbox/") and self.path.endswith("/ack"):
             if not self._authorized(body):
@@ -647,6 +951,65 @@ class SoulHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.CREATED, self.server.store.seed_soul(realm, guid, name))
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": "invalid_soul", "detail": str(error)})
+        elif self.path == "/admin/v1/world/forge":
+            if not self._admin_session(csrf=True):
+                return
+            try:
+                payload = json.loads(body)
+                job = self.server.worlds.create_forge_job(
+                    str(payload.get("seed_prompt", "")), str(payload.get("faction", "")),
+                    str(payload.get("player_role", "")),
+                )
+                self.server.jobs.put_nowait({"kind": "world_forge", "job_id": job["job_id"],
+                                             "request": {key: job[key] for key in ("seed_prompt", "faction", "player_role")}})
+                self._json(HTTPStatus.ACCEPTED, job)
+            except (ValueError, TypeError, json.JSONDecodeError) as error:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "forge_failed", "detail": str(error)})
+        elif self.path == "/admin/v1/world/companions":
+            if not self._admin_session(csrf=True):
+                return
+            try:
+                payload = json.loads(body)
+                guid = str(payload.get("bot_guid", ""))
+                bots = self.server.control("GET", "/v1/bots").get("bots", [])
+                bot = next((item for item in bots if str(item.get("guid")) == guid), None)
+                if not bot:
+                    raise ValueError("bot is not available in this realm")
+                companion = self.server.worlds.promote_companion(
+                    guid, str(bot["name"]), str(payload.get("role", "dps"))
+                )
+                self._json(HTTPStatus.CREATED, companion)
+            except (ValueError, TypeError, RuntimeError, json.JSONDecodeError) as error:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "promotion_failed", "detail": str(error)})
+        elif self.path in {"/admin/v1/world/actions/enter", "/admin/v1/world/actions/leave"}:
+            if not self._admin_session(csrf=True):
+                return
+            action = "start" if self.path.endswith("/enter") else "stop"
+            self._admin_control("POST", f"/v1/actions/{action}", {})
+        elif self.path == "/admin/v1/ai/providers":
+            if not self._admin_session(csrf=True):
+                return
+            try:
+                payload = json.loads(body)
+                secret = str(payload.pop("api_key", ""))
+                encrypted = self.server.provider_gateway.cipher.encrypt(secret) if secret else ""
+                self._json(HTTPStatus.CREATED, self.server.worlds.save_provider(payload, encrypted))
+            except (ValueError, TypeError, json.JSONDecodeError) as error:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "invalid_provider", "detail": str(error)})
+        elif self.path.startswith("/admin/v1/ai/providers/") and self.path.endswith("/test"):
+            if not self._admin_session(csrf=True):
+                return
+            provider_id = self.path.split("/")[-2]
+            profile = self.server.worlds.provider(provider_id, include_secret=True)
+            try:
+                payload = json.loads(body or b"{}")
+                if not profile:
+                    raise ValueError("unknown provider")
+                model = str(payload.get("model") or self.server.worlds.routes()["dialogue"]["model"])
+                result = self.server.provider_gateway.generate(profile, model, "Reply with exactly: connected", 0, 32, timeout=30)
+                self._json(HTTPStatus.OK, {"status": "connected", "reply": result.text[:120]})
+            except Exception as error:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "provider_test_failed", "detail": str(error)})
         elif self.path.startswith("/admin/v1/server/actions/"):
             if not self._admin_session(csrf=True):
                 return
@@ -705,6 +1068,24 @@ class SoulHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:  # noqa: N802
         parsed_path = urlparse(self.path).path
+        if parsed_path in {"/admin/v1/ai/state", "/admin/v1/ai/routing"}:
+            if not self._admin_session(csrf=True):
+                return
+            body = self._read_admin_body()
+            if body is None:
+                return
+            try:
+                payload = json.loads(body)
+                if parsed_path.endswith("/state"):
+                    result = self.server.worlds.save_ai_state(payload)
+                    self.server.ai_enabled = result["enabled"]
+                    self.server.souls_enabled = result["enabled"]
+                else:
+                    result = {"routes": self.server.worlds.save_routes(payload)}
+                self._json(HTTPStatus.OK, result)
+            except (ValueError, TypeError, json.JSONDecodeError) as error:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "invalid_ai_configuration", "detail": str(error)})
+            return
         if parsed_path.startswith("/admin/v1/souls/") and parsed_path.endswith("/skill"):
             if not self._admin_session(csrf=True):
                 return
@@ -742,11 +1123,16 @@ class SoulHandler(BaseHTTPRequestHandler):
                     raise ValueError("install the model before activating it")
                 self.server.model = model
                 local["chat_model"] = model
+                routes = self.server.worlds.routes()
+                routes["dialogue"]["model"] = model
+                self.server.worlds.save_routes({"dialogue": routes["dialogue"]})
             if "souls_enabled" in payload:
                 if not isinstance(payload["souls_enabled"], bool):
                     raise ValueError("souls_enabled must be boolean")
                 self.server.souls_enabled = payload["souls_enabled"]
+                self.server.ai_enabled = payload["souls_enabled"]
                 local["souls_enabled"] = "true" if payload["souls_enabled"] else "false"
+                local["ai_enabled"] = local["souls_enabled"]
             if "temperature" in payload:
                 temperature = float(payload["temperature"])
                 if not 0 <= temperature <= 2:
@@ -788,6 +1174,26 @@ class SoulHandler(BaseHTTPRequestHandler):
         if not self._admin_session(csrf=True):
             return
         parts = urlparse(self.path).path.split("/")
+        if len(parts) == 6 and parts[1:5] == ["admin", "v1", "ai", "providers"]:
+            provider_id = parts[5]
+            if provider_id == "ollama-local":
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "local_provider_required"})
+                return
+            connection = self.server.store.connect()
+            try:
+                cursor = connection.execute("DELETE FROM provider_profiles WHERE id=?", (provider_id,))
+                connection.commit()
+            except sqlite3.IntegrityError:
+                self._json(HTTPStatus.CONFLICT, {"error": "provider_in_use"})
+                self.server.store.close(connection)
+                return
+            self.server.store.close(connection)
+            if cursor.rowcount:
+                self.send_response(HTTPStatus.NO_CONTENT)
+                self.end_headers()
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return
         if len(parts) == 8 and parts[1:4] == ["admin", "v1", "souls"] and parts[6] == "memories":
             try:
                 deleted = self.server.store.delete_memory(unquote(parts[4]), parts[5], int(parts[7]))
@@ -892,6 +1298,26 @@ class SoulHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", f"{content_type}; charset=utf-8" if content_type.startswith("text/") else content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store" if candidate.name == "index.html" else "public, max-age=31536000, immutable")
+        self._security_headers()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _addon_download(self) -> None:
+        root = self.server.addon_dir
+        if not root.is_dir():
+            self._json(HTTPStatus.NOT_FOUND, {"error": "addon_not_packaged"})
+            return
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for path in sorted(root.iterdir()):
+                if path.is_file():
+                    archive.writestr(f"SoulforgeCommander/{path.name}", path.read_bytes())
+        body = buffer.getvalue()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Disposition", 'attachment; filename="SoulforgeCommander.zip"')
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self._security_headers()
         self.end_headers()
         self.wfile.write(body)

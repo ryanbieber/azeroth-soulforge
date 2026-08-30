@@ -1,5 +1,10 @@
 # Playerbots party hotkeys
 
+> **Fallback workflow:** Soulforge Commander is now the primary interface. The
+> dashboard packages a hold-to-open radial command wheel with mouse-direction
+> selection. Keep these macros only for troubleshooting or commands not yet on
+> the wheel.
+
 These commands match Soulforge's pinned `mod-playerbots` revision. Put each
 line in a WoW macro and drag the macro to an action-bar hotkey. Use `/p` for a
 five-player party. In a raid, use `/ra` to reach the whole raid.

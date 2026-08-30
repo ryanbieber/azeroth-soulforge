@@ -12,6 +12,98 @@ servers:
 security:
   - adminSession: []
 paths:
+  /home:
+    get:
+      summary: Return the active world, human presence, AI usage, companions, rumors, and service state
+      responses: {"200": {description: Home dashboard snapshot}}
+  /world:
+    get:
+      summary: Return the active immutable prompted world
+      responses: {"200": {description: Active world or null}}
+  /world/forge:
+    post:
+      summary: Queue fresh-world canon and dungeon-group generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [seed_prompt, faction, player_role]
+              properties:
+                seed_prompt: {type: string, minLength: 20, maxLength: 12000}
+                faction: {type: string, enum: [alliance, horde]}
+                player_role: {type: string, enum: [tank, healer, dps]}
+      responses: {"202": {description: Forge job queued}, "400": {description: Invalid or active world}}
+  /world/chronicle:
+    get:
+      summary: Return append-only memories for the active world
+      responses: {"200": {description: World memories}}
+  /world/rumors:
+    get:
+      summary: Return spoiler-free hints for planned narrative events
+      responses: {"200": {description: Rumors and tensions}}
+  /world/companions:
+    get:
+      summary: Return deep-memory companions bound to the active world
+      responses: {"200": {description: Companion party}}
+    post:
+      summary: Promote an existing Playerbot to a deep-memory companion
+      responses: {"201": {description: Companion promoted}}
+  /world/actions/{action}:
+    post:
+      summary: Enter or leave the persistent world
+      parameters:
+        - name: action
+          in: path
+          required: true
+          schema: {type: string, enum: [enter, leave]}
+      responses: {"200": {description: Game service action completed}}
+  /jobs/{job_id}:
+    get:
+      summary: Inspect an asynchronous generation job
+      parameters:
+        - {name: job_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses: {"200": {description: Job state}, "404": {description: Unknown job}}
+  /ai/providers:
+    get:
+      summary: List AI provider profiles without returning credentials
+      responses: {"200": {description: Provider profiles}}
+    post:
+      summary: Add or replace a local or paid AI provider profile
+      responses: {"201": {description: Provider saved}}
+  /ai/providers/{provider_id}/test:
+    post:
+      summary: Test one provider and model using its server-side credential
+      parameters:
+        - {name: provider_id, in: path, required: true, schema: {type: string}}
+      responses: {"200": {description: Provider connected}, "400": {description: Test failed}}
+  /ai/routing:
+    get:
+      summary: Return separate director and dialogue model routes
+      responses: {"200": {description: AI routes}}
+    put:
+      summary: Replace director and dialogue model routes
+      responses: {"200": {description: AI routes saved}}
+  /ai/state:
+    get:
+      summary: Return the global AI switch, optional monthly cap, and auto-pause delay
+      responses: {"200": {description: AI safeguards}}
+    put:
+      summary: Update the global AI switch, optional monthly cap, or auto-pause delay
+      responses: {"200": {description: AI safeguards saved}}
+  /ai/usage:
+    get:
+      summary: Return normalized monthly tokens, requests, and estimated spend
+      responses: {"200": {description: Monthly AI usage}}
+  /addon/download:
+    get:
+      summary: Download the generated Soulforge Commander addon archive
+      responses:
+        "200":
+          description: WoW 3.3.5a addon ZIP
+          content: {application/zip: {schema: {type: string, format: binary}}}
   /session:
     get:
       summary: Inspect the current authenticated session

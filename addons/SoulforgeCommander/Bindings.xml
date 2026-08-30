@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="SOULFORGE_TOGGLE" header="SOULFORGE_COMMANDER" runOnUp="true">
+    SoulforgeCommander_Binding(keystate)
+  </Binding>
+</Bindings>

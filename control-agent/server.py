@@ -300,6 +300,29 @@ ORDER BY player_added DESC,c.name;
     return rows
 
 
+def player_presence() -> dict[str, Any]:
+    """Return only aggregate human presence plus safe display names."""
+    query = """
+SELECT c.guid,c.name
+FROM acore_characters.characters c
+JOIN acore_auth.account a ON a.id=c.account
+WHERE c.online=1
+  AND LOWER(a.username) NOT LIKE 'rndbot%'
+  AND LOWER(a.username) NOT LIKE 'addclass%'
+ORDER BY c.name;
+"""
+    players = []
+    try:
+        output = mysql(query)
+    except RuntimeError:
+        output = ""
+    for line in output.splitlines():
+        fields = line.split("\t")
+        if len(fields) == 2 and re.fullmatch(r"[1-9][0-9]{0,19}", fields[0]):
+            players.append({"guid": fields[0], "name": fields[1][:24]})
+    return {"humans_online": len(players), "players": players}
+
+
 class ControlHandler(BaseHTTPRequestHandler):
     server_version = "SoulforgeControl/1.0"
 
@@ -313,7 +336,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             services = [service_state(name) for name in (
                 "ac-database", "ac-authserver", "ac-worldserver", "ollama", "soul-service"
             )]
-            self._json(HTTPStatus.OK, {"services": services})
+            self._json(HTTPStatus.OK, {"services": services, **player_presence()})
         elif self.path == "/v1/settings":
             settings: dict[str, Any] = {"realm_name": realm_name(), "realm_type": realm_type()}
             for name, (filename, keys, minimum, _) in SETTING_KEYS.items():
@@ -324,6 +347,8 @@ class ControlHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, settings)
         elif self.path == "/v1/bots":
             self._json(HTTPStatus.OK, {"bots": list_bots()})
+        elif self.path == "/v1/presence":
+            self._json(HTTPStatus.OK, player_presence())
         elif self.path == "/v1/auction-house/characters":
             self._json(HTTPStatus.OK, {"characters": auction_house_characters()})
         else:

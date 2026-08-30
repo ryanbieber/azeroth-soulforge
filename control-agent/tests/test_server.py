@@ -142,6 +142,12 @@ class ControlSettingsTests(unittest.TestCase):
         self.assertFalse(bots[0]["player_added"])
         self.assertTrue(bots[1]["player_added"])
 
+    def test_presence_excludes_random_and_class_bots(self) -> None:
+        with patch.object(control, "mysql", return_value="202\tOwner\n303\tFriend\n"):
+            presence = control.player_presence()
+        self.assertEqual(presence["humans_online"], 2)
+        self.assertEqual([player["name"] for player in presence["players"]], ["Owner", "Friend"])
+
     def test_auction_house_requires_a_character_before_enabling(self) -> None:
         with self.assertRaisesRegex(ValueError, "choose a dedicated"):
             control.update_auction_house_settings({
