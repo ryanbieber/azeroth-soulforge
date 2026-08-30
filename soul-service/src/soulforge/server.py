@@ -560,6 +560,22 @@ class SoulforgeServer(ThreadingHTTPServer):
         )
         self.provider_gateway = ProviderGateway(SecretCipher(master_key))
         self.worlds = WorldRepository(store, self.ollama_url, self.model)
+        bootstrap_key = os.environ.get("SOULFORGE_OPENAI_API_KEY", "").strip()
+        if bootstrap_key and not self.worlds.provider("openai-primary"):
+            base_url = os.environ.get("SOULFORGE_OPENAI_BASE_URL", "https://api.openai.com").rstrip("/")
+            if base_url.endswith("/v1"):
+                base_url = base_url[:-3]
+            model = os.environ.get("SOULFORGE_OPENAI_MODEL", "gpt-5.6-luna").strip()
+            self.worlds.save_provider({
+                "id": "openai-primary", "name": "OpenAI", "kind": "openai",
+                "base_url": base_url, "enabled": True,
+            }, self.provider_gateway.cipher.encrypt(bootstrap_key))
+            self.worlds.save_routes({
+                "director": {"provider_id": "openai-primary", "model": model,
+                             "temperature": 0.7, "max_tokens": 4096},
+                "dialogue": {"provider_id": "openai-primary", "model": model,
+                             "temperature": 0.75, "max_tokens": 180},
+            })
         self.ai_enabled = self.worlds.ai_state()["enabled"]
         self.login_attempts: dict[str, list[float]] = {}
         self.login_lock = Lock()
@@ -632,8 +648,43 @@ class SoulforgeServer(ThreadingHTTPServer):
         reply = self._route_generation("dialogue", prompt)
         if reply and self.ai_enabled:
             world_id = self.store.complete(event, reply)
+            if event.get("channel") in {"party", "raid", "guild"}:
+                self._banter_followup(event, reply)
             if world_id:
                 self.jobs.put_nowait({"kind": "memory_compaction", "world_id": world_id})
+
+    def _banter_followup(self, event: dict[str, Any], first_reply: str) -> None:
+        companions = self.worlds.companions()
+        if len(companions) < 2:
+            return
+        first_guid = str(event["participants"][0]["guid"])
+        first_index = next(
+            (index for index, item in enumerate(companions) if str(item["bot_guid"]) == first_guid),
+            0,
+        )
+        responder = companions[(first_index + 1) % len(companions)]
+        first_name = str(event["participants"][0]["name"])
+        synthetic = {
+            "realm_id": event["realm_id"],
+            "participants": [{"guid": str(responder["bot_guid"]), "name": responder["name"]}],
+            "actor": {"guid": first_guid, "kind": "soul", "name": first_name},
+            "channel": "party",
+            "text": first_reply,
+        }
+        prompt_data = self.store.build_prompt(synthetic)
+        if prompt_data is None:
+            return
+        prompt = prompt_data[2] + (
+            "\nReply as a witty in-character party interjection to the other companion. "
+            "Keep it to one or two short sentences, add personality rather than exposition, "
+            "and do not issue gameplay commands."
+        )
+        reply = self._route_generation("dialogue", prompt)
+        if reply and self.ai_enabled:
+            self.store.enqueue_proactive(
+                f"{event['event_id']}:banter", event["realm_id"], str(responder["bot_guid"]),
+                str(event["actor"]["guid"]), reply,
+            )
 
     def _compact_world_memory(self, world_id: str) -> None:
         candidates = self.worlds.memory_candidates(world_id)

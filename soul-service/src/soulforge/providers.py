@@ -104,10 +104,18 @@ class ProviderGateway:
 
     def _openai(self, profile: dict[str, Any], key: str, model: str, prompt: str,
                 temperature: float, max_tokens: int, timeout: int) -> InferenceResult:
+        body: dict[str, Any] = {
+            "model": model,
+            "input": prompt,
+            "max_output_tokens": max_tokens,
+        }
+        # Current GPT-5 and o-series reasoning models reject temperature rather
+        # than ignoring it. Older chat-capable models still accept the control.
+        if not model.startswith(("gpt-5", "o1", "o3", "o4")):
+            body["temperature"] = temperature
         payload = self._request(
             f"{profile['base_url'].rstrip('/')}/v1/responses",
-            {"model": model, "input": prompt, "temperature": temperature,
-             "max_output_tokens": max_tokens},
+            body,
             {"Authorization": f"Bearer {key}"},
             timeout,
         )

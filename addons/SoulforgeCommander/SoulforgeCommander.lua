@@ -6,6 +6,7 @@ local scopes = {
   { label = "Damage", prefix = "@dps " },
 }
 local actions = {
+  { label = "Assemble", command = "assemble" },
   { label = "Follow", command = "follow" },
   { label = "Attack", command = "attack" },
   { label = "Tank pull", command = "tankpull" },
@@ -15,6 +16,8 @@ local actions = {
   { label = "Stay", command = "stay" },
 }
 local scopeIndex, selectedIndex = 1, nil
+local companionNames = { "Richpiana", "Wife", "Donaldtrump", "Samhyde" }
+local assembleQueue, assembleElapsed = {}, 0
 
 BINDING_HEADER_SOULFORGE_COMMANDER = "Soulforge Commander"
 BINDING_NAME_SOULFORGE_TOGGLE = "Hold command wheel"
@@ -25,6 +28,13 @@ local function channel()
 end
 
 local function issue(command)
+  if command == "assemble" then
+    assembleQueue = {}
+    for _, name in ipairs(companionNames) do table.insert(assembleQueue, name) end
+    assembleElapsed = 1
+    DEFAULT_CHAT_FRAME:AddMessage("|cffd5a84bSoulforge:|r Assembling Richpiana, Wife, Donaldtrump, and Samhyde...")
+    return
+  end
   local scope = scopes[scopeIndex]
   if command == "tankpull" then
     if scope.target then
@@ -47,6 +57,15 @@ local function issue(command)
     return
   end
   SendChatMessage(scope.prefix .. command, channel())
+end
+
+local function updateAssembly(elapsed)
+  if #assembleQueue == 0 then return end
+  assembleElapsed = assembleElapsed + elapsed
+  if assembleElapsed < 0.8 then return end
+  assembleElapsed = 0
+  local name = table.remove(assembleQueue, 1)
+  SendChatMessage(".playerbots bot add " .. name, "SAY")
 end
 
 local function updateCenter()
@@ -124,7 +143,10 @@ wheel:EnableMouse(true)
 wheel:EnableMouseWheel(true)
 wheel:SetBackdrop({ bgFile = "Interface/Tooltips/UI-Tooltip-Background", edgeFile = "Interface/Tooltips/UI-Tooltip-Border", edgeSize = 18, insets = { left = 5, right = 5, top = 5, bottom = 5 } })
 wheel:SetBackdropColor(0.025, 0.04, 0.055, 0.92)
-wheel:SetScript("OnUpdate", trackMouse)
+wheel:SetScript("OnUpdate", function(_, elapsed)
+  if wheel:IsShown() then trackMouse() end
+  updateAssembly(elapsed)
+end)
 wheel:SetScript("OnMouseWheel", function(_, delta)
   scopeIndex = scopeIndex + (delta > 0 and 1 or -1)
   if scopeIndex > #scopes then scopeIndex = 1 end

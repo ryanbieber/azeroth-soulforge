@@ -585,6 +585,18 @@ dialogue remains affordable and private on local hardware.
 write-only to the browser, provider bills are authoritative, and reaching a cap
 falls back to local Ollama when available.
 
+### 2026-08-30 — Bootstrap paid AI without an unused local-model download
+
+**Decision:** A fresh install with `SOULFORGE_OPENAI_API_KEY` skips the default
+Ollama model pull and imports an encrypted OpenAI profile once. A trailing
+`/v1` is normalized, and GPT-5/o-series requests omit unsupported temperature.
+
+**Reason:** Owners who already chose paid inference should not download unused
+weights, and current reasoning models reject some legacy sampling controls.
+
+**Consequence:** AI Studio remains authoritative after first boot; startup never
+overwrites an existing provider profile or route.
+
 ### 2026-08-29 — Supersede macros with a hold-to-open radial commander
 
 **Decision:** Ship Soulforge Commander as a downloadable 3.3.5a addon. A mapped

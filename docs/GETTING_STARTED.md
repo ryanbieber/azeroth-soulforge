@@ -53,6 +53,9 @@ Edit `.env` and replace every placeholder:
 | `SOULFORGE_CONTROL_SECRET` | Authenticates the internal control agent; use at least 32 characters |
 | `SOULFORGE_ADMIN_PASSWORD` | Dashboard sign-in; use at least 12 characters and keep it unique |
 | `SOULFORGE_SECRETS_KEY` | Encrypts provider API keys at rest; use a unique random value of at least 24 characters |
+| `SOULFORGE_OPENAI_API_KEY` | Optional first-boot OpenAI key; skips the local model download and imports into encrypted provider storage |
+| `SOULFORGE_OPENAI_BASE_URL` | Optional OpenAI endpoint; a trailing `/v1` is normalized |
+| `SOULFORGE_OPENAI_MODEL` | Optional first-boot OpenAI model for direction and dialogue |
 | `SOULFORGE_GAME_USERNAME` | WoW client login name |
 | `SOULFORGE_GAME_PASSWORD` | WoW 3.3.5a login password; 8–16 letters and numbers |
 | `SOULFORGE_LAN_IP` | Stable address of the server host |
@@ -200,6 +203,9 @@ with improvised SQL.
 
 You can install a stronger Ollama model from the dashboard when the host has
 enough RAM/storage. Changing models does not change companion identity.
+When `SOULFORGE_OPENAI_API_KEY` is present on first boot, `make up` skips the
+default model download and imports the paid profile once. Later AI Studio
+provider and routing changes are not overwritten by startup.
 
 ## Troubleshooting
 

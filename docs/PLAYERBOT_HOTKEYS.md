@@ -5,6 +5,10 @@
 > selection. Keep these macros only for troubleshooting or commands not yet on
 > the wheel.
 
+Use **Assemble** after login to pace four `.playerbots bot add` commands for
+Richpiana, Wife, Donaldtrump, and Samhyde. Playerbots logs them in and invites
+them to the owner's group; the remaining wheel actions then control the party.
+
 These commands match Soulforge's pinned `mod-playerbots` revision. Put each
 line in a WoW macro and drag the macro to an action-bar hotkey. Use `/p` for a
 five-player party. In a raid, use `/ra` to reach the whole raid.
