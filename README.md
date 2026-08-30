@@ -79,7 +79,7 @@ make verify    # run repository tests and contract checks
 ```
 
 On first use, the dashboard asks for a world prompt, faction, and intended
-player role, then forges canon and four complementary companions from the
+player role, then forges canon and a complementary companion party from the
 available Playerbot roster. It can start, stop, and restart the game services; configure the
 realm name and Normal/PvP/RP/RP-PvP type; choose a 1–80 starting level for new
 characters; tune Playerbot population and bounded XP, reputation, loot, money,
@@ -92,7 +92,8 @@ gameplay action—the language model is only a social layer.
 
 The dashboard also packages **Soulforge Commander**, a 3.3.5a addon with a
 hold-to-open radial command wheel. Map one button, move the mouse toward Follow,
-Stay, Flee, Attack, Tank Pull, Rebuff, or Reset, and release.
+Stay, Flee, Attack, Tank Pull, Rebuff, or Reset, and release. Each authenticated
+download includes the active world's current companion roster for Assemble.
 
 ## Important safety notes
 

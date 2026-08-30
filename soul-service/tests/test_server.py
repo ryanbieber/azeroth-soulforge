@@ -1,6 +1,7 @@
 import json
 import hashlib
 import hmac
+import io
 from threading import Thread
 import time
 from pathlib import Path
@@ -9,6 +10,7 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
+import zipfile
 
 from soulforge.server import SoulStore, build_server
 
@@ -104,6 +106,27 @@ class HealthServerTests(unittest.TestCase):
             "GET", "/admin/v1/souls/test/2/skill", headers={"Cookie": cookie}, include_headers=True
         )
         self.assertIn("Ironforge", updated["document"])
+
+    def test_addon_download_infers_companions_from_active_world(self) -> None:
+        self.server.addon_dir = Path(__file__).resolve().parents[2] / "addons" / "SoulforgeCommander"
+        self.server.worlds.companions = lambda: [
+            {"name": "Firstbot"}, {"name": "Secondbot"},
+        ]
+        _, headers = self._request(
+            "POST", "/admin/v1/session", {"password": "test-admin-password"}, include_headers=True
+        )
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        request = Request(
+            f"{self.base_url}/admin/v1/addon/download", headers={"Cookie": cookie}
+        )
+        with urlopen(request, timeout=2) as response:
+            archive_bytes = response.read()
+        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+            roster = archive.read("SoulforgeCommander/Companions.lua").decode()
+            source = archive.read("SoulforgeCommander/SoulforgeCommander.lua").decode()
+        self.assertIn('"Firstbot"', roster)
+        self.assertIn('"Secondbot"', roster)
+        self.assertNotIn("Firstbot", source)
 
     def test_skill_file_uses_character_name_but_preserves_internal_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

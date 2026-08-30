@@ -135,7 +135,7 @@ class ControlSettingsTests(unittest.TestCase):
             "mysql",
             return_value=(
                 "101\tWorldbot\t19\t1\t1\t1\trndbot1\t0\n"
-                "202\tWife\t1\t2\t7\t0\tCARNufex\t1\n"
+                "202\tPlayeralt\t1\t2\t7\t0\tOwneraccount\t1\n"
             ),
         ):
             bots = control.list_bots()

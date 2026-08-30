@@ -78,9 +78,10 @@ and free space. `make firewall` asks for the Linux password once and permits
 ports 3724, 8085, and 8765 only from the configured trusted subnet. `make up`
 starts the whole Compose application.
 
-The first run downloads source, containers, extracted map data, and the default
-3.4 GB model, and compiles AzerothCore. It can take considerably longer than
-later starts. In another terminal, monitor it with:
+The first run downloads source, containers, and extracted map data, and compiles
+AzerothCore. Without a paid-provider key it also downloads the default 3.4 GB
+local model. It can take considerably longer than later starts. In another
+terminal, monitor it with:
 
 ```bash
 make status
@@ -105,7 +106,7 @@ it, then sign in using `SOULFORGE_ADMIN_PASSWORD`.
 On a fresh install the dashboard opens **Forge your world**. Write one world
 prompt describing the tone, history, people, tensions, and social texture you
 want, choose your faction and combat role, then forge. Soulforge turns that
-seed into immutable canon, selects a complementary four-bot dungeon group, and
+seed into immutable canon, selects a complementary companion party, and
 plans spoiler-free future threads. Once it is ready, **Enter world** starts the
 game services. World time advances only while a human player is online.
 
@@ -144,8 +145,8 @@ dialogue model.
 
 Your own normal-account characters appear first in the **All bots** roster with
 a **Player-added companion** flag; generated `rndbot` characters remain in the
-separate world-population section. This makes companions such as `Wife` easy to
-find and forge into souls without making every random world bot an LLM user.
+separate world-population section. This makes personal characters easy to find
+and forge into souls without making every random world bot an LLM user.
 
 ## 6. Connect a WoW client
 
@@ -162,14 +163,20 @@ the server and client are on the same LAN.
 
 ## 7. Command your companion party
 
-Download **Soulforge Commander** from the dashboard and copy its folder into
-`Interface/AddOns` in the WoW client. Enable it at character selection, then map
+Forge the world and select its companions before downloading **Soulforge
+Commander** from the dashboard. The authenticated download is assembled for
+the active world: its generated `Companions.lua` contains the current companion
+names in party order. No character names are hardcoded in the repository.
+
+Copy the downloaded folder into `Interface/AddOns` in the WoW client. Enable it at character selection, then map
 **Hold command wheel** under **Soulforge Commander** in WoW Key Bindings. Hold
 the mapped keyboard or controller button, aim the mouse toward Follow, Attack,
 Tank pull, Flee, Reset, Rebuff, or Stay, and release. Use the mouse wheel while
-aiming to select everyone, a role, or one companion; right-click cancels.
+aiming to select everyone, a role, or one companion; right-click cancels. Use
+**Assemble** after login to add every configured companion to the party. Download
+a fresh addon package after changing the active companion roster.
 
-The initial four companions receive deep-memory profiles automatically. Each
+The forged companions receive deep-memory profiles automatically. Each
 profile is materialized inside Soul Service as:
 
 ```text

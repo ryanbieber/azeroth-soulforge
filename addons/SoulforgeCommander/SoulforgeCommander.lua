@@ -16,7 +16,7 @@ local actions = {
   { label = "Stay", command = "stay" },
 }
 local scopeIndex, selectedIndex = 1, nil
-local companionNames = { "Richpiana", "Wife", "Donaldtrump", "Samhyde" }
+local companionNames = SoulforgeCommanderCompanions or {}
 local assembleQueue, assembleElapsed = {}, 0
 
 BINDING_HEADER_SOULFORGE_COMMANDER = "Soulforge Commander"
@@ -29,10 +29,14 @@ end
 
 local function issue(command)
   if command == "assemble" then
+    if #companionNames == 0 then
+      DEFAULT_CHAT_FRAME:AddMessage("|cffd5a84bSoulforge:|r No companions are configured. Forge or promote companions, then download the addon again.")
+      return
+    end
     assembleQueue = {}
     for _, name in ipairs(companionNames) do table.insert(assembleQueue, name) end
     assembleElapsed = 1
-    DEFAULT_CHAT_FRAME:AddMessage("|cffd5a84bSoulforge:|r Assembling Richpiana, Wife, Donaldtrump, and Samhyde...")
+    DEFAULT_CHAT_FRAME:AddMessage("|cffd5a84bSoulforge:|r Assembling your forged companions...")
     return
   end
   local scope = scopes[scopeIndex]

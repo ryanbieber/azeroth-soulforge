@@ -495,7 +495,7 @@ out of scope.
 
 **Decision:** Bundle an optional WoW 3.3.5a addon with five Playerbots actions:
 follow, hold, attack, rebuff, and flee. It selects party or raid automatically;
-mouse modifiers can address `Wife` or healer-role bots, while controller users
+mouse modifiers can address one named companion or healer-role bots, while controller users
 cycle among those three scopes with one explicit binding.
 
 **Reason:** A human tank needs immediate, deliberate group control without a
@@ -510,7 +510,7 @@ chat commands supported by Playerbots.
 
 **Decision:** Remove Party Commander and document five controller-ready General
 Macros instead: follow, hold, attack, rebuff, and flee. Each macro chooses the
-current party or raid, with Ctrl for `Wife` and Shift for healer-role bots.
+current party or raid, with Ctrl for one named companion and Shift for healer-role bots.
 
 **Reason:** The owner requested a limited controller surface without installing
 or maintaining a client addon.
@@ -609,3 +609,18 @@ commands or maintaining a bank of action-bar macros.
 **Consequence:** The addon still emits only user-initiated, supported Playerbots
 chat commands. It has no HTTP, credential, inference, or autonomous gameplay
 authority. The prior macro approach remains only a fallback.
+
+### 2026-08-30 — Generate the addon roster from the active world
+
+**Decision:** Keep Soulforge Commander's source package character-agnostic. On
+each authenticated download, Soul Service generates `Companions.lua` from the
+active world's ordered companion bindings. Assemble reads only that generated
+roster.
+
+**Reason:** Each fresh world has its own people. Operators should be able to
+forge a party, download the addon, and play without editing Lua or inheriting
+another world's example character names.
+
+**Consequence:** The client addon remains offline and credential-free. Operators
+download it again after changing companions; an empty-world package reports that
+no companions are configured instead of issuing commands.

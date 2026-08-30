@@ -5,9 +5,10 @@
 > selection. Keep these macros only for troubleshooting or commands not yet on
 > the wheel.
 
-Use **Assemble** after login to pace four `.playerbots bot add` commands for
-Richpiana, Wife, Donaldtrump, and Samhyde. Playerbots logs them in and invites
-them to the owner's group; the remaining wheel actions then control the party.
+Forge or promote companions before downloading the addon. The server-generated
+package infers the ordered companion roster from the active world. Use
+**Assemble** after login to pace one `.playerbots bot add` command per configured
+companion; Playerbots logs them in and invites them to the owner's group.
 
 These commands match Soulforge's pinned `mod-playerbots` revision. Put each
 line in a WoW macro and drag the macro to an action-bar hotkey. Use `/p` for a
@@ -63,17 +64,17 @@ controller software once per character layout. A server cannot create client
 macros for you, so this is the supported account-wide approach.
 
 Normal press controls your current party or raid automatically. Hold **Ctrl**
-to whisper `Wife` only; hold **Shift** to reach healer-role bots. Ctrl takes
-priority if both are held. Replace `Wife` with another companion name only if
-you rename that character.
+to whisper one named companion; hold **Shift** to reach healer-role bots. Ctrl
+takes priority if both are held. Replace `CompanionName` below with the exact
+name shown on the dashboard.
 
 | Macro | Body |
 | --- | --- |
-| Follow | `/run w=IsControlKeyDown();SendChatMessage(w and"follow"or(IsShiftKeyDown()and"@heal follow"or"follow"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
-| Hold | `/run w=IsControlKeyDown();SendChatMessage(w and"stay"or(IsShiftKeyDown()and"@heal stay"or"stay"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
-| Attack | `/run w=IsControlKeyDown();SendChatMessage(w and"attack"or(IsShiftKeyDown()and"@heal attack"or"attack"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
-| Rebuff | `/run w=IsControlKeyDown();SendChatMessage(w and"rebuff"or(IsShiftKeyDown()and"@heal rebuff"or"rebuff"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
-| Flee | `/run w=IsControlKeyDown();SendChatMessage(w and"flee"or(IsShiftKeyDown()and"@heal flee"or"flee"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"Wife")` |
+| Follow | `/run w=IsControlKeyDown();SendChatMessage(w and"follow"or(IsShiftKeyDown()and"@heal follow"or"follow"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"CompanionName")` |
+| Hold | `/run w=IsControlKeyDown();SendChatMessage(w and"stay"or(IsShiftKeyDown()and"@heal stay"or"stay"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"CompanionName")` |
+| Attack | `/run w=IsControlKeyDown();SendChatMessage(w and"attack"or(IsShiftKeyDown()and"@heal attack"or"attack"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"CompanionName")` |
+| Rebuff | `/run w=IsControlKeyDown();SendChatMessage(w and"rebuff"or(IsShiftKeyDown()and"@heal rebuff"or"rebuff"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"CompanionName")` |
+| Flee | `/run w=IsControlKeyDown();SendChatMessage(w and"flee"or(IsShiftKeyDown()and"@heal flee"or"flee"),w and"WHISPER"or(GetNumRaidMembers()>0 and"RAID"or"PARTY"),nil,w and"CompanionName")` |
 
 Start with follow, stay, attack, tank attack, pull, flee, and reset. Test more
 specialized strategy commands outside an instance before relying on them in a
