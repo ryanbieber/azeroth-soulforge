@@ -59,7 +59,11 @@ set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.RandomBot
 set_config runtime/azerothcore/etc/modules/progression_system.conf ProgressionSystem.Bracket_0 1
 set_config runtime/azerothcore/etc/modules/progression_system.conf ProgressionSystem.Bracket_1_19 1
 set_config runtime/azerothcore/etc/worldserver.conf StartPlayerLevel "${SOULFORGE_NEW_CHARACTER_LEVEL:-1}"
-set_config runtime/azerothcore/etc/worldserver.conf StartHeroicPlayerLevel "${SOULFORGE_NEW_CHARACTER_LEVEL:-1}"
+if ! rg -q '^StartHeroicPlayerLevel[[:space:]]*=' runtime/azerothcore/etc/worldserver.conf; then
+  printf '\nStartHeroicPlayerLevel = %s\n' "${SOULFORGE_HEROIC_CHARACTER_LEVEL:-55}" >> runtime/azerothcore/etc/worldserver.conf
+else
+  set_config runtime/azerothcore/etc/worldserver.conf StartHeroicPlayerLevel "${SOULFORGE_HEROIC_CHARACTER_LEVEL:-55}"
+fi
 set_config runtime/azerothcore/etc/worldserver.conf PlayerLimit "${SOULFORGE_PLAYER_LIMIT:-100}"
 mkdir -p "$REPO_ROOT/.run"
 touch "$MARKER"

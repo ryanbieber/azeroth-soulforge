@@ -25,7 +25,11 @@ $COMPOSE wait ac-db-import
 ./scripts/create-account.sh
 
 $COMPOSE up --detach ollama
-$COMPOSE exec -T ollama ollama pull "${SOULFORGE_CHAT_MODEL:-qwen3.5:4b}"
+if [[ -n "${SOULFORGE_OPENAI_API_KEY:-}" ]]; then
+  echo "OpenAI API key detected; skipping local Ollama model download."
+else
+  $COMPOSE exec -T ollama ollama pull "${SOULFORGE_CHAT_MODEL:-qwen3.5:4b}"
+fi
 $COMPOSE up --detach --build --wait --wait-timeout 900
 
 trap - ERR
