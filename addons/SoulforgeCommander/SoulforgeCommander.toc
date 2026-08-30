@@ -2,7 +2,6 @@
 ## Title: Soulforge Commander
 ## Notes: User-initiated GUI controls for a Playerbots dungeon group.
 ## Author: Azeroth Soulforge contributors
-## Version: 1.0.0
+## Version: 1.1.0
 ## SavedVariables: SoulforgeCommanderDB
-Companions.lua
 SoulforgeCommander.lua

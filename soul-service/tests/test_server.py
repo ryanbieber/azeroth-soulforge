@@ -107,11 +107,12 @@ class HealthServerTests(unittest.TestCase):
         )
         self.assertIn("Ironforge", updated["document"])
 
-    def test_addon_download_infers_companions_from_active_world(self) -> None:
+    def test_addon_download_is_generic_and_roster_sync_uses_active_world(self) -> None:
         self.server.addon_dir = Path(__file__).resolve().parents[2] / "addons" / "SoulforgeCommander"
         self.server.worlds.companions = lambda: [
-            {"name": "Firstbot"}, {"name": "Secondbot"},
+            {"name": "Firstbot", "role": "tank"}, {"name": "Secondbot", "role": "healer"},
         ]
+        self.server.worlds.active_world = lambda: {"realm_id": "azeroth-soulforge"}
         _, headers = self._request(
             "POST", "/admin/v1/session", {"password": "test-admin-password"}, include_headers=True
         )
@@ -122,11 +123,17 @@ class HealthServerTests(unittest.TestCase):
         with urlopen(request, timeout=2) as response:
             archive_bytes = response.read()
         with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
-            roster = archive.read("SoulforgeCommander/Companions.lua").decode()
+            files = archive.namelist()
             source = archive.read("SoulforgeCommander/SoulforgeCommander.lua").decode()
-        self.assertIn('"Firstbot"', roster)
-        self.assertIn('"Secondbot"', roster)
+        self.assertNotIn("SoulforgeCommander/Companions.lua", files)
         self.assertNotIn("Firstbot", source)
+        self.assertIn(".soulforge roster", source)
+
+        roster = self._signed_get("/v1/companion-roster?realm_id=azeroth-soulforge")
+        self.assertEqual(roster["companions"], [
+            {"name": "Firstbot", "role": "tank"},
+            {"name": "Secondbot", "role": "healer"},
+        ])
 
     def test_skill_file_uses_character_name_but_preserves_internal_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -150,6 +157,19 @@ class HealthServerTests(unittest.TestCase):
             f"{self.base_url}/v1/events", data=body,
             headers={"Content-Type": "application/json", "X-Soulforge-Timestamp": timestamp,
                      "X-Soulforge-Nonce": nonce, "X-Soulforge-Signature": signature},
+        )
+        with urlopen(request, timeout=2) as response:
+            return json.load(response)
+
+    def _signed_get(self, path: str) -> dict[str, object]:
+        timestamp = str(int(time.time()))
+        nonce = str(uuid4())
+        canonical = f"GET\n{path}\n{timestamp}\n{nonce}\n".encode()
+        signature = hmac.new(b"test-secret", canonical, hashlib.sha256).hexdigest()
+        request = Request(
+            f"{self.base_url}{path}",
+            headers={"X-Soulforge-Timestamp": timestamp, "X-Soulforge-Nonce": nonce,
+                     "X-Soulforge-Signature": signature},
         )
         with urlopen(request, timeout=2) as response:
             return json.load(response)

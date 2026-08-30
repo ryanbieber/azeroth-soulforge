@@ -92,8 +92,10 @@ gameplay action—the language model is only a social layer.
 
 The dashboard also packages **Soulforge Commander**, a 3.3.5a addon with a
 hold-to-open radial command wheel. Map one button, move the mouse toward Follow,
-Stay, Flee, Attack, Tank Pull, Rebuff, or Reset, and release. Each authenticated
-download includes the active world's current companion roster for Assemble.
+Stay, Flee, Attack, Tank Pull, Rebuff, or Reset, and release. The installed
+addon synchronizes the active world's companion roster in game and
+provides a panel to enable, disable, add, or remove local entries. Companion
+changes never require another download.
 
 ## Important safety notes
 

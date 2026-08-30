@@ -163,18 +163,20 @@ the server and client are on the same LAN.
 
 ## 7. Command your companion party
 
-Forge the world and select its companions before downloading **Soulforge
-Commander** from the dashboard. The authenticated download is assembled for
-the active world: its generated `Companions.lua` contains the current companion
-names in party order. No character names are hardcoded in the repository.
+Download **Soulforge Commander** from the dashboard once. The package contains
+no character names or credentials. After login, it requests the ordered roster
+from the active world through the game server and stores your selections in
+WoW's SavedVariables.
 
 Copy the downloaded folder into `Interface/AddOns` in the WoW client. Enable it at character selection, then map
 **Hold command wheel** under **Soulforge Commander** in WoW Key Bindings. Hold
 the mapped keyboard or controller button, aim the mouse toward Follow, Attack,
 Tank pull, Flee, Reset, Rebuff, or Stay, and release. Use the mouse wheel while
 aiming to select everyone, a role, or one companion; right-click cancels. Use
-**Assemble** after login to add every configured companion to the party. Download
-a fresh addon package after changing the active companion roster.
+**Companions** on the wheel to view the server roster, enable or disable entries,
+add a local character name, or sync immediately. Use **Assemble** after login to
+add every enabled companion to the party. Future server-side companion changes
+sync automatically and never require reinstalling or downloading the addon.
 
 The forged companions receive deep-memory profiles automatically. Each
 profile is materialized inside Soul Service as:

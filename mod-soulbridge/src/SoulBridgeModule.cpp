@@ -4,6 +4,8 @@
  */
 
 #include "Config.h"
+#include "Chat.h"
+#include "CommandScript.h"
 #include "Group.h"
 #include "Guild.h"
 #include "Log.h"
@@ -32,6 +34,8 @@
 #include <string>
 #include <thread>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace SoulBridge
 {
@@ -46,6 +50,13 @@ struct Reply
     uint32 BotGuid = 0;
     uint32 RecipientGuid = 0;
     std::string Text;
+};
+
+struct RosterReply
+{
+    uint32 RecipientGuid = 0;
+    bool Available = false;
+    std::vector<std::pair<std::string, std::string>> Companions;
 };
 
 std::string JsonEscape(std::string const& value)
@@ -206,8 +217,18 @@ public:
         _events.push_back({ payload.str() });
     }
 
+    void RequestRoster(Player const* player)
+    {
+        if (!_running || !player)
+            return;
+        std::lock_guard<std::mutex> lock(_rosterMutex);
+        if (_rosterRequests.size() < 32)
+            _rosterRequests.push_back(player->GetGUID().GetCounter());
+    }
+
     void DeliverReplies()
     {
+        DeliverRosterReplies();
         for (uint32 delivered = 0; delivered < 5; ++delivered)
         {
             std::optional<Reply> reply;
@@ -308,9 +329,73 @@ private:
                     LOG_DEBUG("module.soulbridge", "Event delivery returned HTTP {}", response.Status);
             }
 
+            std::optional<uint32> rosterRecipient;
+            {
+                std::lock_guard<std::mutex> lock(_rosterMutex);
+                if (!_rosterRequests.empty())
+                {
+                    rosterRecipient = _rosterRequests.front();
+                    _rosterRequests.pop_front();
+                }
+            }
+            if (rosterRecipient)
+                FetchRoster(*rosterRecipient);
+
             AcknowledgeReplies();
             PollReplies();
             std::this_thread::sleep_for(std::chrono::milliseconds(_pollInterval));
+        }
+    }
+
+    void FetchRoster(uint32 recipientGuid)
+    {
+        std::string target = "/v1/companion-roster?realm_id=" + _realmId;
+        HttpResponse response = Request("GET", target, "");
+        RosterReply roster;
+        roster.RecipientGuid = recipientGuid;
+        roster.Available = response.Status == 200;
+        if (roster.Available)
+        {
+            std::size_t cursor = 0;
+            while ((cursor = response.Body.find("\"name\":", cursor)) != std::string::npos)
+            {
+                auto name = JsonStringField(response.Body, "name", cursor);
+                auto role = JsonStringField(response.Body, "role", cursor);
+                if (!name || !role)
+                    break;
+                roster.Companions.emplace_back(*name, *role);
+                cursor += 7;
+            }
+        }
+        std::lock_guard<std::mutex> lock(_rosterMutex);
+        _rosterReplies.push_back(std::move(roster));
+    }
+
+    void DeliverRosterReplies()
+    {
+        for (uint32 delivered = 0; delivered < 5; ++delivered)
+        {
+            std::optional<RosterReply> roster;
+            {
+                std::lock_guard<std::mutex> lock(_rosterMutex);
+                if (_rosterReplies.empty())
+                    return;
+                roster = std::move(_rosterReplies.front());
+                _rosterReplies.pop_front();
+            }
+            Player* recipient = ObjectAccessor::FindPlayerByLowGUID(roster->RecipientGuid);
+            if (!recipient)
+                continue;
+            ChatHandler handler(recipient->GetSession());
+            if (!roster->Available)
+            {
+                handler.SendSysMessage("SOULFORGE_ROSTER:ERROR");
+                continue;
+            }
+            handler.SendSysMessage("SOULFORGE_ROSTER:BEGIN");
+            for (auto const& [name, role] : roster->Companions)
+                handler.SendSysMessage("SOULFORGE_ROSTER:" + name + ":" + role);
+            handler.SendSysMessage("SOULFORGE_ROSTER:END");
         }
     }
 
@@ -406,6 +491,38 @@ private:
     std::deque<Reply> _replies;
     std::deque<std::string> _acknowledgements;
     std::unordered_set<std::string> _pendingReplyIds;
+    std::mutex _rosterMutex;
+    std::deque<uint32> _rosterRequests;
+    std::deque<RosterReply> _rosterReplies;
+};
+
+class SoulBridgeCommandScript : public CommandScript
+{
+public:
+    SoulBridgeCommandScript() : CommandScript("SoulBridgeCommandScript") { }
+
+    Acore::ChatCommands::ChatCommandTable GetCommands() const override
+    {
+        using namespace Acore::ChatCommands;
+        static ChatCommandTable soulforgeCommands =
+        {
+            { "roster", HandleRosterCommand, SEC_PLAYER, Console::No }
+        };
+        static ChatCommandTable commands =
+        {
+            { "soulforge", soulforgeCommands }
+        };
+        return commands;
+    }
+
+    static bool HandleRosterCommand(ChatHandler* handler)
+    {
+        Player* player = handler->GetPlayer();
+        if (!player)
+            return false;
+        Bridge::Instance().RequestRoster(player);
+        return true;
+    }
 };
 
 class SoulBridgePlayerScript : public PlayerScript
@@ -476,6 +593,7 @@ public:
 
 void Addmod_soulbridgeScripts()
 {
+    new SoulBridge::SoulBridgeCommandScript();
     new SoulBridge::SoulBridgePlayerScript();
     new SoulBridge::SoulBridgeWorldScript();
 }

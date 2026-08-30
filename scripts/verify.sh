@@ -63,6 +63,7 @@ python3 scripts/validate-pages.py
 
 npm --prefix dashboard ci --ignore-scripts
 npm --prefix dashboard run build
+npm --prefix dashboard exec -- luaparse --file addons/SoulforgeCommander/SoulforgeCommander.lua --quiet
 
 docker compose --env-file .env.example -f compose.yaml config --quiet
 

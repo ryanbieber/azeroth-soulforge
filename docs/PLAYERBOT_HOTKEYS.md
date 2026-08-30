@@ -5,10 +5,11 @@
 > selection. Keep these macros only for troubleshooting or commands not yet on
 > the wheel.
 
-Forge or promote companions before downloading the addon. The server-generated
-package infers the ordered companion roster from the active world. Use
-**Assemble** after login to pace one `.playerbots bot add` command per configured
-companion; Playerbots logs them in and invites them to the owner's group.
+The installed addon synchronizes its ordered roster from the active world after
+login. Its Companion Setup panel can enable or disable server entries and add
+local names without another download. Use **Assemble** to pace one `.playerbots
+bot add` command per enabled companion; Playerbots logs them in and invites them
+to the owner's group.
 
 These commands match Soulforge's pinned `mod-playerbots` revision. Put each
 line in a WoW macro and drag the macro to an action-bar hotkey. Use `/p` for a

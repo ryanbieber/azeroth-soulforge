@@ -610,17 +610,18 @@ commands or maintaining a bank of action-bar macros.
 chat commands. It has no HTTP, credential, inference, or autonomous gameplay
 authority. The prior macro approach remains only a fallback.
 
-### 2026-08-30 — Generate the addon roster from the active world
+### 2026-08-30 — Synchronize the installed addon from the active world
 
-**Decision:** Keep Soulforge Commander's source package character-agnostic. On
-each authenticated download, Soul Service generates `Companions.lua` from the
-active world's ordered companion bindings. Assemble reads only that generated
-roster.
+**Decision:** Keep Soulforge Commander's package character-agnostic. The addon
+requests `.soulforge roster` after login; Soulbridge resolves the active world's
+ordered bindings asynchronously and returns machine-readable system messages.
+The addon saves enabled state and local additions in SavedVariables and exposes
+them in Companion Setup.
 
 **Reason:** Each fresh world has its own people. Operators should be able to
 forge a party, download the addon, and play without editing Lua or inheriting
 another world's example character names.
 
-**Consequence:** The client addon remains offline and credential-free. Operators
-download it again after changing companions; an empty-world package reports that
-no companions are configured instead of issuing commands.
+**Consequence:** The client addon remains external-network-free and
+credential-free. It is installed once, server roster changes synchronize without
+a new download, and players can configure who Assemble invites from inside WoW.

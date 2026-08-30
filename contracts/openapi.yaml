@@ -65,6 +65,29 @@ paths:
                     type: array
                     items: {$ref: "#/components/schemas/Reply"}
         "401": {description: Invalid signature or replay protection metadata}
+  /v1/companion-roster:
+    get:
+      operationId: getCompanionRoster
+      summary: Return the active world's ordered companion roster
+      parameters:
+        - name: realm_id
+          in: query
+          required: true
+          schema: {type: string, pattern: "^[A-Za-z0-9._-]{1,64}$"}
+      responses:
+        "200":
+          description: Active companion names and party roles
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [companions]
+                properties:
+                  companions:
+                    type: array
+                    items: {$ref: "#/components/schemas/CompanionRosterEntry"}
+        "401": {description: Invalid signature or replay protection metadata}
   /v1/outbox/{reply_id}/ack:
     post:
       operationId: acknowledgeReply
@@ -111,6 +134,13 @@ components:
       properties:
         event_id: {type: string, format: uuid}
         status: {type: string, enum: [accepted, duplicate]}
+    CompanionRosterEntry:
+      type: object
+      additionalProperties: false
+      required: [name, role]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 24}
+        role: {type: string, enum: [tank, healer, dps]}
     Reply:
       type: object
       additionalProperties: false
