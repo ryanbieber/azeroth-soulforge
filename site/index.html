@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Build a private AzerothCore Playerbots realm with persistent companion profiles and local Ollama dialogue.">
+    <meta name="description" content="Prompt a fresh private Azeroth world, live in it with persistent companions, and pause it when you leave.">
     <meta name="theme-color" content="#101512">
-    <title>Azeroth Soulforge — Local Server Guide</title>
+    <title>Azeroth Soulforge — Prompt Your Own Fresh Azeroth</title>
     <link rel="stylesheet" href="assets/styles.css">
     <script src="assets/app.js" defer></script>
   </head>
@@ -21,7 +21,8 @@
       </a>
       <nav aria-label="Primary navigation">
         <a href="#launch">Quick start</a>
-        <a href="#connect">Connect</a>
+        <a href="#forge">Forge a world</a>
+        <a href="#commander">Command wheel</a>
         <a href="#troubleshooting">Help</a>
         <a class="repo-link" href="https://github.com/ryanbieber/azeroth-soulforge">GitHub</a>
       </nav>
@@ -30,9 +31,9 @@
     <main id="main">
       <section class="hero" id="top">
         <div class="hero-copy">
-          <p class="eyebrow">Your realm. Your guild. Your machine.</p>
-          <h1>Bring a private Azeroth realm to life on your home network.</h1>
-          <p class="lede">AzerothCore, Playerbots, staged progression, persistent companion stories, and a local language model—operated as one Docker application.</p>
+          <p class="eyebrow">Your prompt. Your companions. Your world.</p>
+          <h1>Prompt a fresh Azeroth world and live inside it.</h1>
+          <p class="lede">One world seed shapes immutable canon, companion identities, rumors, and future story threads. Enter when you want to play; when you leave, the world waits with you.</p>
           <div class="actions">
             <a class="button primary" href="#launch">Start the guide</a>
             <a class="button secondary" href="https://github.com/ryanbieber/azeroth-soulforge">View repository</a>
@@ -44,15 +45,15 @@
           <p class="card-label">ONE LOCAL STACK</p>
           <div class="stack-line"><span class="stack-icon">AC</span><div><strong>AzerothCore 3.3.5a</strong><small>Private realm and progression</small></div></div>
           <div class="stack-line"><span class="stack-icon">PB</span><div><strong>Playerbots</strong><small>Authoritative gameplay AI</small></div></div>
-          <div class="stack-line"><span class="stack-icon">SF</span><div><strong>Soulforge</strong><small>Profiles, memory, and dashboard</small></div></div>
-          <div class="stack-line"><span class="stack-icon">OL</span><div><strong>Ollama</strong><small>Private local dialogue</small></div></div>
+          <div class="stack-line"><span class="stack-icon">SF</span><div><strong>Soulforge Director</strong><small>Canon, memory, rumors, and future threads</small></div></div>
+          <div class="stack-line"><span class="stack-icon">AI</span><div><strong>Your chosen model</strong><small>Local Ollama or a paid provider</small></div></div>
           <div class="card-footer"><span class="pulse"></span> Runs on your hardware</div>
         </div>
       </section>
 
       <section class="principles" aria-label="Project guarantees">
         <article><span>01</span><h2>Private by design</h2><p>Game and dashboard traffic stays on your trusted LAN. No cloud model is required.</p></article>
-        <article><span>02</span><h2>One lifecycle</h2><p><code>make up</code> and <code>make down</code> control the complete application.</p></article>
+        <article><span>02</span><h2>Nothing races ahead</h2><p>Narrative time advances only while you are online. The realm can stop after you leave.</p></article>
         <article><span>03</span><h2>Gameplay stays deterministic</h2><p>Playerbots owns gameplay. The language model supplies social dialogue only.</p></article>
       </section>
 
@@ -87,6 +88,7 @@ cp .env.example .env</code></pre></div>
               <div><code>BRIDGE_SECRET</code><span>Long event-bridge secret</span></div>
               <div><code>CONTROL_SECRET</code><span>Different secret, at least 32 characters</span></div>
               <div><code>ADMIN_PASSWORD</code><span>Dashboard password, at least 12 characters</span></div>
+              <div><code>SOULFORGE_SECRETS_KEY</code><span>Unique key that encrypts provider credentials at rest</span></div>
               <div><code>GAME_USERNAME / PASSWORD</code><span>Your private WoW login</span></div>
               <div><code>LAN_IP / BIND_ADDRESS / LAN_CIDR</code><span>Your host address and trusted subnet</span></div>
             </div>
@@ -116,7 +118,7 @@ make firewall</code></pre></div>
         <div class="section-heading"><p class="step-number">CONNECT</p><h2>Dashboard and game client</h2></div>
         <div class="connect-grid">
           <article class="connect-card">
-            <p class="card-kicker">CONTROL PLANE</p><h3>Open the dashboard</h3><p>From a trusted device on the same LAN. Settings let you choose the realm type, set a boost level for newly created characters, tune bounded gameplay rates, and assign an optional auction-house character without editing server files:</p>
+            <p class="card-kicker">CONTROL PLANE</p><h3>Open the dashboard</h3><p>From a trusted device on the same LAN. The first screen asks for a world prompt, faction, and your dungeon role. Everyday controls stay focused on forging, entering, companions, world history, and AI:</p>
             <div class="address">https://YOUR_LAN_IP:8765</div>
             <p>Verify the private address, accept the expected self-signed certificate, and sign in with <code>SOULFORGE_ADMIN_PASSWORD</code>.</p>
           </article>
@@ -128,20 +130,26 @@ make firewall</code></pre></div>
         </div>
       </section>
 
-      <section class="content-section soul-section" id="first-soul">
-        <div class="soul-copy"><p class="step-number">YOUR FIRST COMPANION</p><h2>Forge a character, not a generic chatbot.</h2><p>Open <strong>Bots</strong> in the dashboard, choose a generated Playerbot, and forge its profile. Give it a voice, values, history, mannerisms, goals, and boundaries.</p><p>Soulforge materializes a name-readable <code>SKILL.md</code> while retaining the immutable AzerothCore GUID internally. Whisper the character in game; local Ollama dialogue and bounded memories persist across restarts.</p><a class="text-link" href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/examples/profiles/Thorn/SKILL.md">Read Thorn’s example profile →</a></div>
-        <div class="skill-preview"><div class="file-tab">Thorn / SKILL.md</div><pre><code><span class="md"># Thorn</span>
+      <section class="content-section soul-section" id="forge">
+        <div class="soul-copy"><p class="step-number">FIRST AWAKENING</p><h2>Begin with one world seed.</h2><p>Describe the Azeroth you want to inhabit: its tone, old grudges, tavern culture, loyalties, dangers, and the kinds of people who live there. Soulforge turns that prompt into immutable canon and selects four complementary Playerbots around your chosen role.</p><p>The director plans spoiler-free future threads from canon and what genuinely happens during play. You see rumors, not hidden plans. Press <strong>Enter world</strong>, launch the game, and return to the same lived timeline every session.</p></div>
+        <div class="skill-preview"><div class="file-tab">W0RLD PROMPT</div><pre><code><span class="md">A hopeful but weathered fresh realm</span>
 
-<span class="muted">## Character skill</span>
+Every inn keeps old stories.
+Rival guilds remember grudges.
+Companionship must be earned.
 
-Weathered road warden.
-Dry, observant, quietly
-protective.
+<span class="muted">Faction</span>  Alliance
+<span class="muted">Your role</span> Damage
 
-<span class="muted">## Values</span>
+Forge fresh world →</code></pre></div>
+      </section>
 
-Loyalty, patience, and
-keeping one's word.</code></pre></div>
+      <section class="content-section split" id="ai-memory">
+        <div class="section-heading"><p class="step-number">AI AND CONTINUITY</p><h2>Choose the mind. Keep memory under control.</h2></div>
+        <div class="connect-grid">
+          <article class="connect-card"><p class="card-kicker">AI STUDIO</p><h3>Local or paid models</h3><p>Use local Ollama, OpenAI, Anthropic, Gemini, or an OpenAI-compatible service. Route world direction and companion dialogue separately, store keys encrypted on the server, set a monthly cap, and stop all new inference with one switch.</p></article>
+          <article class="connect-card"><p class="card-kicker">BOUNDED MEMORY</p><h3>Meaning, not endless transcripts</h3><p>Each companion keeps 60 recent messages. World chat enters a 12-exchange temporary buffer; after eight exchanges, only durable relationships, promises, discoveries, and decisions are distilled into the Chronicle. Raw events and distilled facts also have hard ceilings.</p></article>
+        </div>
       </section>
 
       <section class="content-section" id="operations">
@@ -152,9 +160,9 @@ keeping one's word.</code></pre></div>
         <div class="warning"><strong>Before progression changes:</strong> run <code>make backup</code>. Do not remove Docker volumes or improvise downgrade SQL. Restore the complete snapshot if an unlock fails.</div>
       </section>
 
-      <section class="content-section" id="party-macros">
-        <div class="section-heading"><p class="step-number">LEAD YOUR GROUP</p><h2>Controller-ready General Macros</h2><p>A human tank can control the whole current party or raid with five WoW macros—no addon required.</p></div>
-        <div class="callout"><strong>Normal press</strong> commands the group, <strong>Ctrl</strong> commands your named companion (default <code>Wife</code>), and <strong>Shift</strong> commands healer-role bots. Create them as General Macros to use them on every character in the same WoW account. <a href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/docs/PLAYERBOT_HOTKEYS.md">Macro and binding guide →</a></div>
+      <section class="content-section" id="commander">
+        <div class="section-heading"><p class="step-number">LEAD YOUR GROUP</p><h2>A Mass Effect-style command wheel</h2><p>Download Soulforge Commander from the dashboard and map one keyboard or controller button in WoW.</p></div>
+        <div class="callout"><strong>Hold the mapped button</strong>, move the mouse toward Follow, Attack, Tank pull, Flee, Reset, Rebuff, or Stay, then release to execute. The mouse wheel switches between everyone, role groups, and individual companions; right-click cancels. Commands remain user-initiated Playerbots chat orders—the addon never gives the LLM gameplay authority. <a href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/docs/PLAYERBOT_HOTKEYS.md">Macro fallback →</a></div>
       </section>
 
       <section class="content-section" id="troubleshooting">
@@ -170,7 +178,7 @@ ss -ltn | grep -E ':3724|:8085|:8765'</code></pre></div></div>
     </main>
 
     <footer>
-      <div><a class="brand footer-brand" href="#top">Azeroth <strong>Soulforge</strong></a><p>Local-first companion continuity for a private AzerothCore realm.</p></div>
+      <div><a class="brand footer-brand" href="#top">Azeroth <strong>Soulforge</strong></a><p>A prompted fresh world that waits when you leave.</p></div>
       <div class="footer-links"><a href="https://github.com/ryanbieber/azeroth-soulforge">Repository</a><a href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/LICENSE">License</a><a href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/docs/PROJECT.md">Architecture</a></div>
       <p class="legal">Not affiliated with Blizzard Entertainment. No WoW client, Blizzard game assets, secrets, runtime data, or model weights are distributed.</p>
     </footer>

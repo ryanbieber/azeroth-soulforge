@@ -30,12 +30,21 @@ def main() -> None:
     source = (SITE / "index.html").read_text(encoding="utf-8")
     parser = PageParser()
     parser.feed(source)
-    required = {"requirements", "configure", "launch", "connect", "first-soul", "troubleshooting"}
+    required = {
+        "requirements", "configure", "launch", "connect", "forge",
+        "ai-memory", "commander", "troubleshooting",
+    }
     missing = required - parser.ids
     if missing:
         raise SystemExit(f"site/index.html missing sections: {sorted(missing)}")
     if "YOUR_LAN_IP" not in source or "set realmlist YOUR_LAN_IP" not in source:
         raise SystemExit("site must teach generic LAN and realmlist configuration")
+    for marker in (
+        "SOULFORGE_SECRETS_KEY", "Forge fresh world", "60 recent messages",
+        "Mass Effect-style command wheel",
+    ):
+        if marker not in source:
+            raise SystemExit(f"site/index.html missing product direction: {marker!r}")
     if re.search(r"(?:password|secret)\s*=\s*(?!YOUR_|replace-)[^<\s]+", source, re.I):
         raise SystemExit("site may contain a credential-like value")
     for target in parser.links:
