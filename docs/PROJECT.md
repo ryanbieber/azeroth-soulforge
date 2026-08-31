@@ -773,3 +773,19 @@ cooldown therefore remains inside measured serial inference capacity.
 minute, regardless of the Playerbot population. Companion and ambient requests
 still share one bounded inference worker, operators can lower both controls in
 AI Studio, and no bot-authored message can initiate another response.
+
+### 2026-08-31 — Keep ambient dialogue inside the player's current zone
+
+**Decision:** Continue requiring ambient candidates to share the human player's
+faction and zone, retain the 60-yard requirement for `/say`, and require the
+current zone name to appear in any public-channel destination before inference.
+
+**Reason:** Realm-wide Trade, World, or LookingForGroup reactions dilute local
+zone culture and make unrelated activity follow the player. General,
+LocalDefense, and nearby speech provide a focused sense of the place currently
+being explored.
+
+**Consequence:** Moving zones immediately changes both the eligible random-bot
+population and prompt context. Broad public channels are dismissed without an
+LLM call, while named companions remain available through whisper, party, raid,
+guild, say, and explicitly addressed public chat.

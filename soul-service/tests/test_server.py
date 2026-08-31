@@ -156,6 +156,23 @@ class HealthServerTests(unittest.TestCase):
         self.assertEqual(reply["channel_name"], "General - The Barrens")
         self.assertEqual(self.server.store.souls(), [])
 
+    def test_ambient_random_bot_ignores_non_zone_public_channels(self) -> None:
+        event = {
+            "event_id": str(uuid4()), "realm_id": "test", "event_type": "chat.channel",
+            "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+            "participants": [{"guid": "99", "kind": "playerbot", "name": "Bankalt"}],
+            "channel": "channel", "text": "WTS linen cloth",
+            "context": {"dialogue_tier": "ambient", "channel_name": "Trade - City",
+                        "zone_name": "Stormwind City", "zone_id": 1519},
+            "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+        }
+        self.server.store.accept(event, json.dumps(event))
+        self.server.worlds.save_ai_state({"ambient_reply_percent": 25, "ambient_cooldown_seconds": 5})
+        self.server._route_generation = lambda *_: self.fail("broad channel reached inference")
+        with patch("soulforge.server.secrets.randbelow", return_value=0):
+            self.server._ambient_dialogue(event)
+        self.assertEqual(self.server.store.pending("test", 5), [])
+
     def test_companion_prompt_preview_shows_bounded_layers(self) -> None:
         self.server.store.seed_soul("test", "2", "Companion")
         preview = self.server.store.prompt_preview("test", "2")

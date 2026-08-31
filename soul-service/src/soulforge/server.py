@@ -815,6 +815,14 @@ class SoulforgeServer(ThreadingHTTPServer):
         if not state["ambient_enabled"] or event.get("channel") not in {"say", "channel"}:
             self.store.dismiss(event["event_id"])
             return
+        context = event.get("context", {})
+        zone = str(context.get("zone_name") or "")[:80]
+        channel_name = str(context.get("channel_name") or event["channel"])[:128]
+        if event.get("channel") == "channel" and (
+            not zone or zone.casefold() not in channel_name.casefold()
+        ):
+            self.store.dismiss(event["event_id"])
+            return
         now = time.monotonic()
         with self._ambient_lock:
             if now - self._last_ambient_reply < state["ambient_cooldown_seconds"]:
@@ -825,9 +833,7 @@ class SoulforgeServer(ThreadingHTTPServer):
                 return
             self._last_ambient_reply = now
         bot = event["participants"][0]
-        context = event.get("context", {})
-        zone = str(context.get("zone_name") or "Azeroth")[:80]
-        channel_name = str(context.get("channel_name") or event["channel"])[:128]
+        zone = zone or "Azeroth"
         world = self.worlds.active_world() or {}
         canon = world.get("canon") or {}
         flavor = str(canon.get("regional_flavor") or canon.get("tone") or canon.get("premise") or "classic Azeroth")[:240]

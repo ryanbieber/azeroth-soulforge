@@ -117,10 +117,12 @@ routing. In **AI Studio**, local Ollama and paid OpenAI, Anthropic, Gemini, or
 compatible providers can be configured separately for world direction and
 companion dialogue, while a small local model handles zone-aware ambient chat.
 The ambient route defaults to its measured maximum controls—a 25 percent reply
-chance and five-second global cooldown—and can be reduced in AI Studio. Provider
-keys are encrypted server-side and never returned to the browser. Set an optional
-monthly cap and use the global switch to stop new AI calls. Do not publish this
-dashboard through a router or public tunnel.
+chance and five-second global cooldown—and can be reduced in AI Studio. It only
+answers `/say` or public channels whose name contains your current zone, such as
+General and LocalDefense; broad Trade, World, and LookingForGroup traffic does
+not invoke ambient AI. Provider keys are encrypted server-side and never returned
+to the browser. Set an optional monthly cap and use the global switch to stop new
+AI calls. Do not publish this dashboard through a router or public tunnel.
 
 Under **Settings → Gameplay rates**, multipliers from 0.1×–10× control XP,
 reputation, item loot, money drops, and honor. Profession skill gain accepts

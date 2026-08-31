@@ -40,10 +40,12 @@ Random world bots use a separate local `ambient` route, defaulting to
 human-authored say and public-channel messages receives one ambient response,
 with a global cooldown. Fresh installs default to the measured maximum controls:
 a 25 percent chance and five-second global cooldown, or at most 12 ambient
-replies per minute. The compact prompt includes the actual zone and channel and
-asks for era-appropriate, zone-specific realm culture without storing deep
-personal memory for disposable population bots. AI Studio exposes the route,
-reply chance, cooldown, and per-companion prompt previews.
+replies per minute. Public ambient replies require the current zone name in the
+channel name, so General and LocalDefense remain local while Trade, World, and
+LookingForGroup are ignored. The compact prompt includes the actual zone and
+channel and asks for era-appropriate, zone-specific realm culture without
+storing deep personal memory for disposable population bots. AI Studio exposes
+the route, reply chance, cooldown, and per-companion prompt previews.
 
 Companion, ambient, and companion-to-companion prompts request only the literal
 first-person words the character would type into WoW chat. A final delivery
