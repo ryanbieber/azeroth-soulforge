@@ -281,6 +281,8 @@ class HealthServerTests(unittest.TestCase):
         self.assertIn('wheelMode == "flick"', source)
         self.assertIn("distance >= flickThreshold", source)
         self.assertIn("originX, originY", source)
+        self.assertIn("Flick to command", source)
+        self.assertNotIn("selectionElapsed", source)
         self.assertIn("## Version: 1.2.0", toc)
 
         roster = self._signed_get("/v1/companion-roster?realm_id=azeroth-soulforge")

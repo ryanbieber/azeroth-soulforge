@@ -189,6 +189,7 @@ local function openWheel(mode)
   wheel:ClearAllPoints()
   wheel:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
   setSelected(nil)
+  wheel.help:SetText(wheelMode == "flick" and "Flick to command  |  Right-click to cancel" or "Release to command  |  Right-click to cancel")
   wheel:Show()
 end
 
