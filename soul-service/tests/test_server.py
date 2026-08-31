@@ -156,7 +156,24 @@ class HealthServerTests(unittest.TestCase):
         self.assertEqual(reply["channel_name"], "General - The Barrens")
         self.assertEqual(self.server.store.souls(), [])
 
-    def test_ambient_random_bot_ignores_non_zone_public_channels(self) -> None:
+    def test_ambient_random_bot_ignores_realm_wide_public_channels(self) -> None:
+        event = {
+            "event_id": str(uuid4()), "realm_id": "test", "event_type": "chat.channel",
+            "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+            "participants": [{"guid": "99", "kind": "playerbot", "name": "Bankalt"}],
+            "channel": "channel", "text": "anyone online?",
+            "context": {"dialogue_tier": "ambient", "channel_name": "World",
+                        "zone_name": "Stormwind City", "zone_id": 1519},
+            "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+        }
+        self.server.store.accept(event, json.dumps(event))
+        self.server.worlds.save_ai_state({"ambient_reply_percent": 25, "ambient_cooldown_seconds": 5})
+        self.server._route_generation = lambda *_: self.fail("broad channel reached inference")
+        with patch("soulforge.server.secrets.randbelow", return_value=0):
+            self.server._ambient_dialogue(event)
+        self.assertEqual(self.server.store.pending("test", 5), [])
+
+    def test_ambient_random_bot_allows_shared_city_trade(self) -> None:
         event = {
             "event_id": str(uuid4()), "realm_id": "test", "event_type": "chat.channel",
             "actor": {"guid": "1", "kind": "human", "name": "Owner"},
@@ -168,10 +185,14 @@ class HealthServerTests(unittest.TestCase):
         }
         self.server.store.accept(event, json.dumps(event))
         self.server.worlds.save_ai_state({"ambient_reply_percent": 25, "ambient_cooldown_seconds": 5})
-        self.server._route_generation = lambda *_: self.fail("broad channel reached inference")
+        observed = {}
+        self.server._route_generation = lambda purpose, prompt: observed.update(
+            purpose=purpose, prompt=prompt
+        ) or "how much per stack?"
         with patch("soulforge.server.secrets.randbelow", return_value=0):
             self.server._ambient_dialogue(event)
-        self.assertEqual(self.server.store.pending("test", 5), [])
+        self.assertEqual(observed["purpose"], "ambient")
+        self.assertEqual(self.server.store.pending("test", 5)[0]["channel_name"], "Trade - City")
 
     def test_companion_prompt_preview_shows_bounded_layers(self) -> None:
         self.server.store.seed_soul("test", "2", "Companion")

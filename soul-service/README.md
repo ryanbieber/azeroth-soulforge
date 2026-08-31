@@ -41,7 +41,9 @@ human-authored say and public-channel messages receives one ambient response,
 with a global cooldown. Fresh installs default to the measured maximum controls:
 a 25 percent chance and five-second global cooldown, or at most 12 ambient
 replies per minute. Public ambient replies require the current zone name in the
-channel name, so General and LocalDefense remain local while Trade, World, and
+channel name, so General and LocalDefense remain local. The built-in `Trade -
+City` channel is also eligible because the game only makes it available in
+trade-enabled cities and shares it across those cities. World and
 LookingForGroup are ignored. The compact prompt includes the actual zone and
 channel and asks for era-appropriate, zone-specific realm culture without
 storing deep personal memory for disposable population bots. AI Studio exposes

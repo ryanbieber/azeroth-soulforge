@@ -789,3 +789,19 @@ being explored.
 population and prompt context. Broad public channels are dismissed without an
 LLM call, while named companions remain available through whisper, party, raid,
 guild, say, and explicitly addressed public chat.
+
+### 2026-08-31 — Preserve shared city Trade ambient dialogue
+
+**Decision:** Treat the built-in `Trade - City` channel as eligible ambient
+chat in addition to `/say` and zone-named channels. Continue rejecting World,
+LookingForGroup, and other public channels that are neither zone-named nor the
+built-in city Trade destination.
+
+**Reason:** General and LocalDefense represent one zone, but WoW intentionally
+shares Trade across the larger trade-enabled cities. Suppressing it erased a
+recognizable part of city life rather than narrowing unrelated realm-wide chat.
+
+**Consequence:** A human who can speak in the built-in Trade channel can receive
+an ambient reply there from a same-zone candidate. Moving out of a trade-enabled
+city removes channel access through normal game rules; the Soul Service does not
+make Trade available independently.

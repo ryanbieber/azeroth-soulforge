@@ -818,11 +818,13 @@ class SoulforgeServer(ThreadingHTTPServer):
         context = event.get("context", {})
         zone = str(context.get("zone_name") or "")[:80]
         channel_name = str(context.get("channel_name") or event["channel"])[:128]
-        if event.get("channel") == "channel" and (
-            not zone or zone.casefold() not in channel_name.casefold()
-        ):
-            self.store.dismiss(event["event_id"])
-            return
+        if event.get("channel") == "channel":
+            folded_channel = channel_name.casefold()
+            zone_local = bool(zone and zone.casefold() in folded_channel)
+            city_trade = folded_channel.startswith("trade - ")
+            if not zone_local and not city_trade:
+                self.store.dismiss(event["event_id"])
+                return
         now = time.monotonic()
         with self._ambient_lock:
             if now - self._last_ambient_reply < state["ambient_cooldown_seconds"]:
