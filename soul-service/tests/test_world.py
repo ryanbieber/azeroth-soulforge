@@ -64,6 +64,9 @@ class WorldRepositoryTests(unittest.TestCase):
         self.assertEqual(summary["series"][-1]["requests"], 1)
 
     def test_kill_switch_and_optional_cap_persist(self) -> None:
+        defaults = self.worlds.ai_state()
+        self.assertEqual(defaults["ambient_reply_percent"], 25)
+        self.assertEqual(defaults["ambient_cooldown_seconds"], 5)
         state = self.worlds.save_ai_state({"enabled": False, "monthly_cap_micros": 500_000,
                                            "auto_stop_minutes": 15, "ambient_enabled": True,
                                            "ambient_reply_percent": 7, "ambient_cooldown_seconds": 45})

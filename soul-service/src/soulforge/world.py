@@ -521,8 +521,8 @@ class WorldRepository:
             "monthly_cap_micros": int(settings.get("monthly_cap_micros", "0")),
             "auto_stop_minutes": int(settings.get("auto_stop_minutes", "10")),
             "ambient_enabled": settings.get("ambient_enabled", "true") == "true",
-            "ambient_reply_percent": int(settings.get("ambient_reply_percent", "5")),
-            "ambient_cooldown_seconds": int(settings.get("ambient_cooldown_seconds", "30")),
+            "ambient_reply_percent": int(settings.get("ambient_reply_percent", "25")),
+            "ambient_cooldown_seconds": int(settings.get("ambient_cooldown_seconds", "5")),
         }
 
     def save_ai_state(self, payload: dict[str, Any]) -> dict[str, Any]:

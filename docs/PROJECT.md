@@ -756,3 +756,20 @@ character. Those formats look artificial when injected into WoW chat.
 **Consequence:** In-game replies read as ordinary player messages. A malformed
 narrative response is silently discarded instead of being shown, and item or
 spell references such as `[Rupture]` remain ordinary chat text.
+
+### 2026-08-31 — Run ambient chatter at the measured traffic ceiling
+
+**Decision:** Raise fresh-install ambient defaults from a five percent chance
+and 30-second cooldown to the allowed maximum of a 25 percent chance and
+five-second global cooldown. Keep `qwen3:1.7b`, thinking disabled, and the
+96-token output ceiling.
+
+**Reason:** Production-style CPU benchmarks on the target Ryzen 5 5600G measured
+approximately 25 generated tokens per second, 210 prompt tokens per second, and
+1.2–2.6 seconds for typical 16–47-token realm-chat replies. The five-second
+cooldown therefore remains inside measured serial inference capacity.
+
+**Consequence:** Human activity can produce at most 12 ambient replies per
+minute, regardless of the Playerbot population. Companion and ambient requests
+still share one bounded inference worker, operators can lower both controls in
+AI Studio, and no bot-authored message can initiate another response.

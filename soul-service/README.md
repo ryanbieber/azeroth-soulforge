@@ -38,8 +38,10 @@ which prevents generated reply loops.
 Random world bots use a separate local `ambient` route, defaulting to
 `qwen3:1.7b` with a 96-token ceiling. Only a low configurable percentage of
 human-authored say and public-channel messages receives one ambient response,
-with a global cooldown. The compact prompt includes the actual zone and channel
-and asks for era-appropriate, zone-specific realm culture without storing deep
+with a global cooldown. Fresh installs default to the measured maximum controls:
+a 25 percent chance and five-second global cooldown, or at most 12 ambient
+replies per minute. The compact prompt includes the actual zone and channel and
+asks for era-appropriate, zone-specific realm culture without storing deep
 personal memory for disposable population bots. AI Studio exposes the route,
 reply chance, cooldown, and per-companion prompt previews.
 
