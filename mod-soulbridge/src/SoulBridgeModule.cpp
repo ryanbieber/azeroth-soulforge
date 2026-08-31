@@ -4,10 +4,13 @@
  */
 
 #include "Config.h"
+#include "Channel.h"
+#include "ChannelMgr.h"
 #include "Chat.h"
 #include "CommandScript.h"
 #include "Group.h"
 #include "Guild.h"
+#include "GuildMgr.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
@@ -49,6 +52,8 @@ struct Reply
     std::string ReplyId;
     uint32 BotGuid = 0;
     uint32 RecipientGuid = 0;
+    std::string Channel;
+    std::string ChannelName;
     std::string Text;
 };
 
@@ -93,6 +98,20 @@ std::string Lower(std::string value)
 bool Mentions(Player const* bot, std::string const& message)
 {
     return bot && Lower(message).find(Lower(bot->GetName())) != std::string::npos;
+}
+
+Player* MentionedControlledBot(Player* player, std::string const& message)
+{
+    PlayerbotMgr* manager = player ? GET_PLAYERBOT_MGR(player) : nullptr;
+    if (!manager)
+        return nullptr;
+    for (auto iterator = manager->GetPlayerBotsBegin(); iterator != manager->GetPlayerBotsEnd(); ++iterator)
+    {
+        Player* bot = iterator->second;
+        if (bot && GET_PLAYERBOT_AI(bot) && Mentions(bot, message))
+            return bot;
+    }
+    return nullptr;
 }
 
 std::optional<std::string> JsonStringField(std::string const& document, std::string const& key, std::size_t start)
@@ -178,7 +197,8 @@ public:
             _worker.join();
     }
 
-    void Enqueue(Player const* player, Player const* bot, uint32 type, std::string const& message)
+    void Enqueue(Player const* player, Player const* bot, uint32 type, std::string const& message,
+        std::string const& channelName = "")
     {
         if (!_running || !player || !bot || message.empty())
             return;
@@ -191,8 +211,17 @@ public:
         std::ostringstream occurredAt;
         occurredAt << std::put_time(&timestamp, "%Y-%m-%dT%H:%M:%SZ");
 
-        std::string channel = type == CHAT_MSG_WHISPER ? "whisper" :
-            (type == CHAT_MSG_GUILD ? "guild" : (type == CHAT_MSG_RAID ? "raid" : "party"));
+        std::string channel = "party";
+        if (type == CHAT_MSG_WHISPER)
+            channel = "whisper";
+        else if (type == CHAT_MSG_SAY)
+            channel = "say";
+        else if (type == CHAT_MSG_GUILD || type == CHAT_MSG_OFFICER)
+            channel = "guild";
+        else if (type == CHAT_MSG_RAID || type == CHAT_MSG_RAID_LEADER || type == CHAT_MSG_RAID_WARNING)
+            channel = "raid";
+        else if (type == CHAT_MSG_CHANNEL)
+            channel = "channel";
         std::ostringstream payload;
         payload << "{\"schema_version\":\"1.0\",\"event_id\":\"" << eventId
                 << "\",\"realm_id\":\"" << JsonEscape(_realmId)
@@ -205,7 +234,10 @@ public:
                 << "\"}],\"channel\":\"" << channel << "\",\"text\":\"" << JsonEscape(message)
                 << "\",\"context\":{\"target_bot_guid\":\"" << bot->GetGUID().GetCounter()
                 << "\",\"target_bot_name\":\"" << JsonEscape(bot->GetName())
-                << "\"},\"trace\":{\"trace_id\":\"" << traceId
+                << "\"";
+        if (!channelName.empty())
+            payload << ",\"channel_name\":\"" << JsonEscape(channelName) << "\"";
+        payload << "},\"trace\":{\"trace_id\":\"" << traceId
                 << "\",\"origin\":\"human\",\"hop_count\":0}}";
 
         std::lock_guard<std::mutex> lock(_eventMutex);
@@ -248,7 +280,54 @@ public:
                 _pendingReplyIds.erase(reply->ReplyId);
                 continue;
             }
-            bot->Whisper(reply->Text, LANG_UNIVERSAL, recipient);
+            bool sent = false;
+            if (reply->Channel == "whisper")
+            {
+                bot->Whisper(reply->Text, LANG_UNIVERSAL, recipient);
+                sent = true;
+            }
+            else if (reply->Channel == "say")
+            {
+                bot->Say(reply->Text, LANG_UNIVERSAL);
+                sent = true;
+            }
+            else if (reply->Channel == "party" || reply->Channel == "raid")
+            {
+                if (Group* group = bot->GetGroup())
+                {
+                    ChatMsg type = reply->Channel == "raid" ? CHAT_MSG_RAID : CHAT_MSG_PARTY;
+                    WorldPacket data;
+                    ChatHandler::BuildChatPacket(data, type, LANG_UNIVERSAL, bot, nullptr, reply->Text);
+                    if (type == CHAT_MSG_RAID)
+                        group->BroadcastPacket(&data, false);
+                    else
+                        group->BroadcastPacket(&data, false, group->GetMemberGroup(bot->GetGUID()));
+                    sent = true;
+                }
+            }
+            else if (reply->Channel == "guild")
+            {
+                if (Guild* guild = sGuildMgr->GetGuildById(bot->GetGuildId()))
+                {
+                    guild->BroadcastToGuild(bot->GetSession(), false, reply->Text, LANG_UNIVERSAL);
+                    sent = true;
+                }
+            }
+            else if (reply->Channel == "channel" && !reply->ChannelName.empty())
+            {
+                if (ChannelMgr* manager = ChannelMgr::forTeam(bot->GetTeamId()))
+                    if (Channel* channel = manager->GetChannel(reply->ChannelName, bot))
+                    {
+                        channel->Say(bot->GetGUID(), reply->Text, LANG_UNIVERSAL);
+                        sent = true;
+                    }
+            }
+            if (!sent)
+            {
+                std::lock_guard<std::mutex> lock(_replyMutex);
+                _pendingReplyIds.erase(reply->ReplyId);
+                continue;
+            }
             {
                 std::lock_guard<std::mutex> lock(_replyMutex);
                 _acknowledgements.push_back(reply->ReplyId);
@@ -412,14 +491,18 @@ private:
             auto replyId = JsonStringField(response.Body, "reply_id", cursor);
             auto botGuid = JsonStringField(response.Body, "bot_guid", cursor);
             auto recipientGuid = JsonStringField(response.Body, "recipient_guid", cursor);
+            auto channel = JsonStringField(response.Body, "channel", cursor);
+            auto channelName = JsonStringField(response.Body, "channel_name", cursor);
             auto text = JsonStringField(response.Body, "text", cursor);
-            if (!replyId || !botGuid || !recipientGuid || !text)
+            if (!replyId || !botGuid || !recipientGuid || !channel || !text)
             {
                 LOG_WARN("module.soulbridge", "Invalid outbox response near byte {}", cursor);
                 return;
             }
             Reply reply;
             reply.ReplyId = *replyId;
+            reply.Channel = *channel;
+            reply.ChannelName = channelName.value_or("");
             try
             {
                 reply.BotGuid = static_cast<uint32>(std::stoul(*botGuid));
@@ -529,10 +612,20 @@ class SoulBridgePlayerScript : public PlayerScript
 {
 public:
     SoulBridgePlayerScript() : PlayerScript("SoulBridgePlayerScript", {
+        PLAYERHOOK_CAN_PLAYER_USE_CHAT,
         PLAYERHOOK_CAN_PLAYER_USE_PRIVATE_CHAT,
         PLAYERHOOK_CAN_PLAYER_USE_GROUP_CHAT,
-        PLAYERHOOK_CAN_PLAYER_USE_GUILD_CHAT
+        PLAYERHOOK_CAN_PLAYER_USE_GUILD_CHAT,
+        PLAYERHOOK_CAN_PLAYER_USE_CHANNEL_CHAT
     }) { }
+
+    bool OnPlayerCanUseChat(Player* player, uint32 type, uint32, std::string& message) override
+    {
+        if (type == CHAT_MSG_SAY && player && !GET_PLAYERBOT_AI(player))
+            if (Player* bot = MentionedControlledBot(player, message))
+                Bridge::Instance().Enqueue(player, bot, type, message);
+        return true;
+    }
 
     bool OnPlayerCanUseChat(Player* player, uint32 type, uint32, std::string& message, Player* receiver) override
     {
@@ -573,6 +666,14 @@ public:
                 break;
             }
         }
+        return true;
+    }
+
+    bool OnPlayerCanUseChat(Player* player, uint32 type, uint32, std::string& message, Channel* channel) override
+    {
+        if (type == CHAT_MSG_CHANNEL && player && !GET_PLAYERBOT_AI(player) && channel)
+            if (Player* bot = MentionedControlledBot(player, message))
+                Bridge::Instance().Enqueue(player, bot, type, message, channel->GetName());
         return true;
     }
 };

@@ -86,7 +86,8 @@ class SoulStore:
             CREATE TABLE IF NOT EXISTS outbox (
               reply_id TEXT PRIMARY KEY, source_event_id TEXT NOT NULL UNIQUE,
               realm_id TEXT NOT NULL, bot_guid TEXT NOT NULL,
-              recipient_guid TEXT NOT NULL, channel TEXT NOT NULL, text TEXT NOT NULL,
+              recipient_guid TEXT NOT NULL, channel TEXT NOT NULL,
+              channel_name TEXT NOT NULL DEFAULT '', text TEXT NOT NULL,
               created_at TEXT NOT NULL, expires_at TEXT NOT NULL, trace_id TEXT NOT NULL,
               acknowledged_at TEXT
             );
@@ -109,6 +110,11 @@ class SoulStore:
                 raise
         try:
             connection.execute("ALTER TABLE souls ADD COLUMN skill_document TEXT NOT NULL DEFAULT ''")
+        except sqlite3.OperationalError as error:
+            if "duplicate column" not in str(error).lower():
+                raise
+        try:
+            connection.execute("ALTER TABLE outbox ADD COLUMN channel_name TEXT NOT NULL DEFAULT ''")
         except sqlite3.OperationalError as error:
             if "duplicate column" not in str(error).lower():
                 raise
@@ -203,6 +209,10 @@ class SoulStore:
         realm, guid = event["realm_id"], str(soul["guid"])
         now = utc_now()
         expires = (datetime.now(timezone.utc) + timedelta(minutes=10)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        channel = str(event.get("channel", "whisper"))
+        if channel not in {"say", "whisper", "party", "raid", "guild", "channel"}:
+            channel = "whisper"
+        channel_name = str(event.get("context", {}).get("channel_name", ""))[:128]
         connection = self.connect()
         connection.execute(
             "INSERT INTO memories(realm_id, bot_guid, role, text, created_at) VALUES(?, ?, 'human', ?, ?)",
@@ -222,10 +232,10 @@ class SoulStore:
         connection.execute(
             """INSERT OR IGNORE INTO outbox
                (reply_id, source_event_id, realm_id, bot_guid, recipient_guid, channel,
-                text, created_at, expires_at, trace_id)
-               VALUES(?, ?, ?, ?, ?, 'whisper', ?, ?, ?, ?)""",
+                channel_name, text, created_at, expires_at, trace_id)
+               VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (str(uuid4()), event["event_id"], realm, guid, str(event["actor"]["guid"]),
-             reply[:1024], now, expires, event["trace"]["trace_id"]),
+             channel, channel_name, reply[:1024], now, expires, event["trace"]["trace_id"]),
         )
         connection.execute("UPDATE events SET status='complete' WHERE event_id=?", (event["event_id"],))
         raw_cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).replace(
@@ -275,7 +285,8 @@ class SoulStore:
         return compact_world_id
 
     def enqueue_proactive(self, source_id: str, realm: str, bot_guid: str,
-                          recipient_guid: str, text: str) -> None:
+                          recipient_guid: str, text: str, channel: str = "whisper",
+                          channel_name: str = "") -> None:
         now = utc_now()
         expires = (datetime.now(timezone.utc) + timedelta(minutes=15)).replace(
             microsecond=0
@@ -283,10 +294,11 @@ class SoulStore:
         connection = self.connect()
         connection.execute(
             """INSERT OR IGNORE INTO outbox
-               (reply_id,source_event_id,realm_id,bot_guid,recipient_guid,channel,text,
-                created_at,expires_at,trace_id) VALUES(?,?,?,?,?,'whisper',?,?,?,?)""",
-            (str(uuid4()), source_id, realm, bot_guid, recipient_guid, text[:1024],
-             now, expires, str(uuid4())),
+               (reply_id,source_event_id,realm_id,bot_guid,recipient_guid,channel,
+                channel_name,text,created_at,expires_at,trace_id)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+            (str(uuid4()), source_id, realm, bot_guid, recipient_guid, channel,
+             channel_name[:128], text[:1024], now, expires, str(uuid4())),
         )
         connection.commit()
         self.close(connection)
@@ -302,6 +314,7 @@ class SoulStore:
             "reply_id": row["reply_id"], "source_event_id": row["source_event_id"],
             "realm_id": row["realm_id"], "bot_guid": row["bot_guid"],
             "recipient_guid": row["recipient_guid"], "channel": row["channel"],
+            "channel_name": row["channel_name"],
             "text": row["text"], "created_at": row["created_at"], "expires_at": row["expires_at"],
             "trace": {"trace_id": row["trace_id"], "origin": "generated", "hop_count": 1},
         } for row in rows]
@@ -694,7 +707,8 @@ class SoulforgeServer(ThreadingHTTPServer):
             "realm_id": event["realm_id"],
             "participants": [{"guid": str(responder["bot_guid"]), "name": responder["name"]}],
             "actor": {"guid": first_guid, "kind": "soul", "name": first_name},
-            "channel": "party",
+            "channel": event.get("channel", "party"),
+            "context": event.get("context", {}),
             "text": first_reply,
         }
         prompt_data = self.store.build_prompt(synthetic)
@@ -709,7 +723,8 @@ class SoulforgeServer(ThreadingHTTPServer):
         if reply and self.ai_enabled:
             self.store.enqueue_proactive(
                 f"{event['event_id']}:banter", event["realm_id"], str(responder["bot_guid"]),
-                str(event["actor"]["guid"]), reply,
+                str(event["actor"]["guid"]), reply, str(event.get("channel", "party")),
+                str(event.get("context", {}).get("channel_name", "")),
             )
 
     def _compact_world_memory(self, world_id: str) -> None:
@@ -1435,7 +1450,7 @@ class SoulHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _validate_event(event: dict[str, Any]) -> None:
-        for key in ("event_id", "realm_id", "actor", "participants", "channel", "text", "trace"):
+        for key in ("event_id", "realm_id", "event_type", "actor", "participants", "channel", "text", "trace"):
             if key not in event:
                 raise ValueError(f"missing {key}")
         if not event["participants"] or event["participants"][0].get("kind") != "soul":
@@ -1449,6 +1464,17 @@ class SoulHandler(BaseHTTPRequestHandler):
                 raise ValueError("invalid character name")
         if event["trace"].get("origin") != "human" or event["trace"].get("hop_count") != 0:
             raise ValueError("generated-event loops are forbidden")
+        channel = str(event["channel"])
+        if channel not in {"say", "whisper", "party", "raid", "guild", "channel"}:
+            raise ValueError("invalid chat channel")
+        if event["event_type"] != f"chat.{channel}":
+            raise ValueError("event type does not match chat channel")
+        context = event.get("context", {})
+        if not isinstance(context, dict):
+            raise ValueError("invalid event context")
+        channel_name = str(context.get("channel_name", ""))
+        if channel == "channel" and not 1 <= len(channel_name) <= 128:
+            raise ValueError("public channel name is required")
         if not 0 < len(event["text"]) <= 4096:
             raise ValueError("invalid text length")
 

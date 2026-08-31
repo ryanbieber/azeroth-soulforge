@@ -1,8 +1,9 @@
 # mod-soulbridge
 
 This AzerothCore module moves approved chat events to the Soul Service and
-delivers returned bot whispers on the world thread. It observes direct whispers
-and bot mentions in group or guild chat. A bounded queue keeps the world thread
+delivers returned bot dialogue on the world thread. It observes direct whispers
+and human-authored companion mentions in say, party, raid, guild, and public
+channel chat. Replies return through the originating chat destination. A bounded queue keeps the world thread
 free of network, database, and inference work; worker threads own signed HTTP
 transport, polling, acknowledgement, and retry.
 
@@ -21,5 +22,5 @@ The module must always preserve the invariants in the root `AGENTS.md`:
 - World hooks enqueue and return without blocking.
 - Worker threads own transport and retry.
 - Reply IDs are held pending to prevent duplicate delivery and acknowledged only
-  after a successful whisper.
+  after successful same-channel delivery.
 - The LLM never emits gameplay commands.

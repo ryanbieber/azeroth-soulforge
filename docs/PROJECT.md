@@ -707,3 +707,20 @@ diagnose slow or unexpectedly expensive routes from ordinary container logs.
 **Consequence:** Prompts, generated text, character conversations, and provider
 credentials remain excluded from operational logs and chart data. Monthly
 totals and estimated spend remain available alongside the rolling plot.
+
+### 2026-08-31 — Keep companion replies in the initiating chat
+
+**Decision:** Capture human-authored companion mentions from say, party, raid,
+guild, and public channel chat in addition to direct whispers, preserve the
+originating destination in the durable outbox, and deliver generated dialogue
+back through that same destination.
+
+**Reason:** A companion answering a party line by whisper breaks the shared
+conversation, while ignoring say and General prevents the player from naturally
+initiating public role-play.
+
+**Consequence:** Shared channels require an explicit companion-name mention,
+only human-authored messages enter the inference path, public-channel replies
+require the bot to be present in that channel, and generated output cannot
+trigger another event. Chat capture remains a bounded enqueue on the world
+thread; all HTTP and inference work stays on workers.

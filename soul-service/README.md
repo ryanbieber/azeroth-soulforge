@@ -29,6 +29,12 @@ docker compose logs --follow soul-service | grep ai_call
 AI Studio keeps the monthly totals and plots input versus output tokens in
 hourly buckets over the latest 24 hours.
 
+Human-authored messages can start companion dialogue by whispering a companion
+or mentioning its character name in say, party, raid, guild, or a public channel
+such as General. The durable outbox preserves that destination so the generated
+reply appears in the same chat. Bot-authored output is never ingested again,
+which prevents generated reply loops.
+
 Run its tests from the repository root with `./scripts/verify.sh` or directly:
 
 ```bash

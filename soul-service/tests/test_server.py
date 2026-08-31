@@ -76,6 +76,39 @@ class HealthServerTests(unittest.TestCase):
         self.assertEqual(first["status"], "accepted")
         self.assertEqual(second["status"], "duplicate")
 
+    def test_replies_return_to_the_human_initiated_chat_channel(self) -> None:
+        store = self.server.store
+        for channel in ("say", "whisper", "party", "raid", "guild", "channel"):
+            with self.subTest(channel=channel):
+                event_id = str(uuid4())
+                context = {"channel_name": "General - Elwynn Forest"} if channel == "channel" else {}
+                event = {
+                    "event_id": event_id,
+                    "realm_id": "test",
+                    "participants": [{"guid": "2", "kind": "soul", "name": "Companion"}],
+                    "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+                    "channel": channel,
+                    "text": "Companion, what do you think?",
+                    "context": context,
+                    "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+                }
+                store.accept(event, json.dumps(event))
+                store.complete(event, "I think we should keep moving.")
+                reply = next(item for item in store.pending("test", 20) if item["source_event_id"] == event_id)
+                self.assertEqual(reply["channel"], channel)
+                self.assertEqual(reply["channel_name"], context.get("channel_name", ""))
+
+    def test_public_channel_event_requires_a_channel_name(self) -> None:
+        event = {
+            "event_id": str(uuid4()), "realm_id": "test", "event_type": "chat.channel",
+            "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+            "participants": [{"guid": "2", "kind": "soul", "name": "Companion"}],
+            "channel": "channel", "text": "Companion?", "context": {},
+            "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+        }
+        with self.assertRaisesRegex(ValueError, "channel name"):
+            self.server.RequestHandlerClass._validate_event(event)
+
     def test_admin_session_requires_password_and_csrf(self) -> None:
         with self.assertRaises(HTTPError) as raised:
             self._request("POST", "/admin/v1/session", {"password": "wrong"})

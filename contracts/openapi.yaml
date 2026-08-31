@@ -151,7 +151,8 @@ components:
         realm_id: {type: string, pattern: "^[A-Za-z0-9._-]{1,64}$"}
         bot_guid: {type: string, pattern: "^[1-9][0-9]{0,19}$"}
         recipient_guid: {type: string, pattern: "^[1-9][0-9]{0,19}$"}
-        channel: {type: string, enum: [say, whisper, party, raid, guild]}
+        channel: {type: string, enum: [say, whisper, party, raid, guild, channel]}
+        channel_name: {type: string, maxLength: 128, description: Public channel name when channel is channel}
         text: {type: string, minLength: 1, maxLength: 1024}
         created_at: {type: string, format: date-time}
         expires_at: {type: string, format: date-time}
