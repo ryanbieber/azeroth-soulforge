@@ -9,6 +9,7 @@ required=(
   docs/LAN_SETUP.md scripts/setup-source.sh scripts/configure-realm.sh
   scripts/create-account.sh scripts/configure-firewall.sh
   scripts/install-module-sql.sh
+  scripts/prewarm-bots.sh
   contracts/openapi.yaml contracts/admin-openapi.yaml contracts/events.schema.json
   contracts/soul-export.schema.json soul-service/pyproject.toml
   soul-service/src/soulforge/providers.py soul-service/src/soulforge/world.py
@@ -28,6 +29,11 @@ required=(
 for path in "${required[@]}"; do
   test -f "$path" || { echo "missing required file: $path" >&2; exit 1; }
 done
+
+rg -qx 'Bindings\.xml' addons/SoulforgeCommander/SoulforgeCommander.toc || {
+  echo "Soulforge Commander TOC does not load Bindings.xml" >&2
+  exit 1
+}
 
 python3 - <<'PY'
 import json

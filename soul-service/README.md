@@ -17,6 +17,18 @@ through the admin API, and excluded from exports. The service describes persiste
 claims that the model is conscious or sentient. Model output is social text
 only and cannot issue gameplay commands.
 
+Every routed inference emits one `ai_call` JSON log line containing the route,
+provider, model, success state, latency, and input/cached-input/output/reasoning/
+total token counts. Prompt and response text and provider credentials are never
+written to this operational log. Follow it with:
+
+```bash
+docker compose logs --follow soul-service | grep ai_call
+```
+
+AI Studio keeps the monthly totals and plots input versus output tokens in
+hourly buckets over the latest 24 hours.
+
 Run its tests from the repository root with `./scripts/verify.sh` or directly:
 
 ```bash

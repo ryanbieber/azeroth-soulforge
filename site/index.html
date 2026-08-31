@@ -107,7 +107,7 @@ make firewall</code></pre></div>
 
         <article class="guide-step">
           <div class="number">4</div>
-          <div class="step-body"><h3>Start the complete application</h3><p>The first start compiles AzerothCore, imports databases and map data, and downloads the default 3.4 GB model. Later starts reuse persistent data.</p>
+          <div class="step-body"><h3>Start the complete application</h3><p>The first start compiles AzerothCore, imports databases and map data, downloads the default 3.4 GB model when needed, and prewarms durable Playerbot state before opening login. It may take several minutes. Later starts reuse the prepared data and bots wait for the human before joining.</p>
             <div class="code-block"><button class="copy" type="button" aria-label="Copy start command">Copy</button><pre><code>make up</code></pre></div>
             <p>Wait for <strong>Azeroth Soulforge is ready</strong>. Use <code>make status</code> or <code>make logs</code> in another terminal to watch progress.</p>
           </div>
@@ -161,7 +161,7 @@ Forge fresh world →</code></pre></div>
       </section>
 
       <section class="content-section" id="commander">
-        <div class="section-heading"><p class="step-number">LEAD YOUR GROUP</p><h2>A Mass Effect-style command wheel</h2><p>Install Soulforge Commander once and map one keyboard or controller button in WoW. It synchronizes the active world's companions through the game server.</p></div>
+        <div class="section-heading"><p class="step-number">LEAD YOUR GROUP</p><h2>A Mass Effect-style command wheel</h2><p>Extract Soulforge Commander and map one keyboard or controller button in WoW. Verify <code>Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc</code> exists; WoW cannot load the ZIP itself. It synchronizes the active world's companions through the game server.</p></div>
         <div class="callout"><strong>Open Companion Setup</strong> to see the server roster, choose who Assemble invites, or add a local character name. No redownload is needed when companions change. Then hold the mapped button, move the mouse toward Follow, Attack, Tank pull, Flee, Reset, Rebuff, or Stay, and release to execute. Commands remain user-initiated Playerbots chat orders—the addon never gives the LLM gameplay authority. <a href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/docs/PLAYERBOT_HOTKEYS.md">Macro fallback →</a></div>
       </section>
 
@@ -173,6 +173,7 @@ make logs
 ss -ltn | grep -E ':3724|:8085|:8765'</code></pre></div></div>
           <div><h3>Check the network</h3><ul><li>Server and client use the same non-guest LAN.</li><li>Wi-Fi client isolation is disabled.</li><li>The configured IP belongs to the host.</li><li>The trusted CIDR contains the client IP.</li><li><code>realmlist.wtf</code> has no URL scheme or port.</li></ul></div>
         </div>
+        <p class="help-row">A fresh large Playerbot population takes time to prepare. The first <code>make up</code> caches bot characters in a maintenance world before opening login; later starts reuse that state and begin conservative bot batches only after the human connects. Run <code>make bots</code> separately only while game services are stopped.</p>
         <p class="help-row">Still stuck? Read the <a href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/docs/GETTING_STARTED.md">full Markdown guide</a> or <a href="https://github.com/ryanbieber/azeroth-soulforge/issues/new/choose">open an issue</a> without including secrets.</p>
       </section>
     </main>

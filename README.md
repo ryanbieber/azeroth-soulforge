@@ -18,8 +18,8 @@ usage, and keeps server administration out of the everyday path.
 - A Linux x86_64 or ARM64 computer on your home network.
 - Docker Engine with the Compose v2 plugin, Git, Make, OpenSSL, curl, Python
   3.8+, and the Linux `ip` command.
-- At least 6 GiB RAM and 15 GiB free disk; more is recommended for larger
-  Ollama models.
+- At least 10 GiB RAM and 15 GiB free disk; more is recommended for larger
+  Playerbot populations and Ollama models.
 - A legally obtained World of Warcraft 3.3.5a build 12340 client for every
   player. The repository does not provide Blizzard software or game data.
 - A stable LAN address for the server. Router port-forwarding is neither needed
@@ -50,8 +50,14 @@ make up
 ```
 
 The first launch is slow: it builds AzerothCore, initializes databases and map
-data, and downloads the default 3.4 GB `qwen3.5:4b` model. Wait for
-`Azeroth Soulforge is ready`.
+data, downloads the default 3.4 GB `qwen3.5:4b` model when paid AI is not
+configured, and prewarms the selected Playerbot population. That maintenance
+world prepares durable bot characters before opening the login server. Wait for
+`Azeroth Soulforge is ready`; later starts reuse the prepared state.
+
+The included MySQL profile gives AzerothCore a 4 GiB InnoDB cache and batches
+redo-log durability once per second. Set `SOULFORGE_DB_BUFFER_POOL_SIZE` in
+`.env` before startup if the host needs a different cache size.
 
 Open `https://YOUR_LAN_IP:8765`, accept the expected self-signed certificate for
 your private server, and sign in with `SOULFORGE_ADMIN_PASSWORD`.
@@ -70,6 +76,7 @@ Start `Wow.exe` directly and use `SOULFORGE_GAME_USERNAME` and
 
 ```bash
 make up        # check the host and start the complete application
+make bots      # prewarm bots separately; game services must be stopped
 make down      # stop it while retaining databases, souls, maps, and models
 make status    # show all Soulforge containers
 make logs      # follow logs
@@ -95,7 +102,10 @@ hold-to-open radial command wheel. Map one button, move the mouse toward Follow,
 Stay, Flee, Attack, Tank Pull, Rebuff, or Reset, and release. The installed
 addon synchronizes the active world's companion roster in game and
 provides a panel to enable, disable, add, or remove local entries. Companion
-changes never require another download.
+changes never require another download. Extract the download and verify the
+client contains exactly
+`Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc`; WoW cannot load
+the ZIP itself or discover a folder nested another level down.
 
 ## Important safety notes
 

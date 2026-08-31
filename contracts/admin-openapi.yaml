@@ -95,7 +95,7 @@ paths:
       responses: {"200": {description: AI safeguards saved}}
   /ai/usage:
     get:
-      summary: Return normalized monthly tokens, requests, and estimated spend
+      summary: Return normalized monthly totals, estimated spend, and a 24-hour hourly token series
       responses: {"200": {description: Monthly AI usage}}
   /addon/download:
     get:

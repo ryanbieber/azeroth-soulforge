@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import re
 from typing import Any
@@ -561,6 +561,8 @@ class WorldRepository:
 
     def usage_summary(self) -> dict[str, Any]:
         month = datetime.now(timezone.utc).strftime("%Y-%m-01T00:00:00Z")
+        current_hour = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        series_start = current_hour - timedelta(hours=23)
         connection = self.store.connect()
         row = connection.execute(
             """SELECT COALESCE(SUM(input_tokens),0) AS input_tokens,
@@ -573,8 +575,26 @@ class WorldRepository:
                FROM ai_usage WHERE created_at>=?""",
             (month,),
         ).fetchone()
+        hourly_rows = connection.execute(
+            """SELECT substr(created_at,1,13) || ':00:00Z' AS bucket,
+                      COALESCE(SUM(input_tokens),0) AS input_tokens,
+                      COALESCE(SUM(output_tokens),0) AS output_tokens,
+                      COALESCE(SUM(reasoning_tokens),0) AS reasoning_tokens,
+                      COUNT(*) AS requests
+               FROM ai_usage WHERE created_at>=?
+               GROUP BY substr(created_at,1,13) ORDER BY bucket""",
+            (series_start.isoformat().replace("+00:00", "Z"),),
+        ).fetchall()
         self.store.close(connection)
-        return {**dict(row), "period_start": month, **self.ai_state()}
+        by_bucket = {item["bucket"]: dict(item) for item in hourly_rows}
+        series = []
+        for offset in range(24):
+            bucket = (series_start + timedelta(hours=offset)).isoformat().replace("+00:00", "Z")
+            series.append(by_bucket.get(bucket, {
+                "bucket": bucket, "input_tokens": 0, "output_tokens": 0,
+                "reasoning_tokens": 0, "requests": 0,
+            }))
+        return {**dict(row), "period_start": month, "series": series, **self.ai_state()}
 
     def paid_budget_available(self, profile: dict[str, Any]) -> bool:
         cap = self.ai_state()["monthly_cap_micros"]

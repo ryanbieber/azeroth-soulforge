@@ -15,7 +15,7 @@ combat, movement, quests, inventory, groups, and all other gameplay.
 
 ## 2. Prepare the host
 
-Use a Linux x86_64 or ARM64 computer with at least 6 GiB RAM and 15 GiB free
+Use a Linux x86_64 or ARM64 computer with at least 10 GiB RAM and 15 GiB free
 disk. Install:
 
 - Docker Engine and the Docker Compose v2 plugin
@@ -143,6 +143,21 @@ in, and watch worldserver CPU and game latency before raising it again. Random
 population bots do not automatically receive Soulforge profiles or invoke the
 dialogue model.
 
+The first `make up` automatically runs the equivalent of `make bots`: a
+maintenance-only worldserver creates and logs in the configured population,
+flushes its generated character state, and stops before authentication opens.
+This can add several minutes to the first startup. Run `make bots` directly only
+when the game services are stopped and you want to complete that preparation
+separately. Normal starts keep random bots offline until a human connects, then
+begin conservative background login batches after a 30-second grace period.
+
+The database defaults to a 4 GiB InnoDB buffer pool because AzerothCore and
+Playerbots quickly overwhelm MySQL's 128 MiB default. It flushes redo logs once
+per second instead of forcing every bot transaction to disk. This is appropriate
+for a private, restartable realm and means a host crash can lose up to the most
+recent second of database work. Set `SOULFORGE_DB_BUFFER_POOL_SIZE` in `.env`
+before `make up` if the host needs another cache size.
+
 Your own normal-account characters appear first in the **All bots** roster with
 a **Player-added companion** flag; generated `rndbot` characters remain in the
 separate world-population section. This makes personal characters easy to find
@@ -168,7 +183,12 @@ no character names or credentials. After login, it requests the ordered roster
 from the active world through the game server and stores your selections in
 WoW's SavedVariables.
 
-Copy the downloaded folder into `Interface/AddOns` in the WoW client. Enable it at character selection, then map
+Extract the downloaded ZIP first; WoW does not load addon ZIP files. Copy the
+extracted folder directly into `Interface/AddOns` in the WoW client and verify
+that the resulting path is exactly
+`Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc` (with no extra
+`addons` or `SoulforgeCommander` directory in between). Restart the client,
+enable it at character selection, then map
 **Hold command wheel** under **Soulforge Commander** in WoW Key Bindings. Hold
 the mapped keyboard or controller button, aim the mouse toward Follow, Attack,
 Tank pull, Flee, Reset, Rebuff, or Stay, and release. Use the mouse wheel while
@@ -234,6 +254,12 @@ Confirm:
 - `SOULFORGE_BIND_ADDRESS` matches it exactly.
 - `SOULFORGE_LAN_CIDR` includes the client address.
 - `realmlist.wtf` contains the server address without `https://` or a port.
+
+A fresh large Playerbot population can take several minutes to generate its
+persistent character state. `make up` performs that one-time work before opening
+authentication. Normal starts seed conservative 25-bot batches, a 30-second
+population-manager interval, and a 250 ms bot reaction delay, and bots wait for
+the human login before joining the world.
 
 If the host IP changes, update the three LAN values in `.env`, run
 `make firewall` and `make up` again, and update every client’s `realmlist.wtf`.

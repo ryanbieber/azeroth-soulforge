@@ -4,6 +4,12 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$REPO_ROOT"
 COMPOSE=${COMPOSE:-docker compose}
+MODE=${1:-up}
+
+if [[ "$MODE" != "up" && "$MODE" != "--bots-only" ]]; then
+  echo "usage: $0 [--bots-only]" >&2
+  exit 2
+fi
 
 ./scripts/check-host.sh
 ./scripts/setup-source.sh
@@ -30,6 +36,20 @@ if [[ -n "${SOULFORGE_OPENAI_API_KEY:-}" ]]; then
 else
   $COMPOSE exec -T ollama ollama pull "${SOULFORGE_CHAT_MODEL:-qwen3.5:4b}"
 fi
+
+if [[ "$MODE" == "--bots-only" ]]; then
+  SOULFORGE_EXPLICIT_BOT_BUILD=1 ./scripts/prewarm-bots.sh
+else
+  ./scripts/prewarm-bots.sh
+fi
+
+if [[ "$MODE" == "--bots-only" ]]; then
+  $COMPOSE down
+  trap - ERR
+  echo "Bot preparation is complete. Run 'make up' when you are ready to play."
+  exit 0
+fi
+
 $COMPOSE up --detach --build --wait --wait-timeout 900
 
 trap - ERR

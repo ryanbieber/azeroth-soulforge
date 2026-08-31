@@ -631,12 +631,38 @@ class SoulforgeServer(ThreadingHTTPServer):
             if not self.ai_enabled:
                 raise RuntimeError("AI was disabled while the response was in flight")
             self.worlds.record_usage(purpose, profile, route["model"], result.usage, latency, True)
+            self._log_ai_call(purpose, profile, route["model"], result.usage, latency, "ok")
             return result.text
         except Exception as error:
             latency = int((time.monotonic() - started) * 1000)
             self.worlds.record_usage(purpose, profile, route["model"], {}, latency, False,
                                      type(error).__name__)
+            self._log_ai_call(
+                purpose, profile, route["model"], {}, latency, "error", type(error).__name__
+            )
             raise
+
+    @staticmethod
+    def _log_ai_call(purpose: str, profile: dict[str, Any], model: str,
+                     usage: dict[str, int], latency_ms: int, status: str,
+                     error_code: str = "") -> None:
+        entry: dict[str, Any] = {
+            "event": "ai_call",
+            "route": purpose,
+            "provider": profile["id"],
+            "provider_kind": profile["kind"],
+            "model": model,
+            "status": status,
+            "latency_ms": latency_ms,
+            "input_tokens": usage.get("input_tokens", 0),
+            "cached_input_tokens": usage.get("cached_input_tokens", 0),
+            "output_tokens": usage.get("output_tokens", 0),
+            "reasoning_tokens": usage.get("reasoning_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+        }
+        if error_code:
+            entry["error_code"] = error_code
+        print(f"ai_call {json.dumps(entry, separators=(',', ':'), sort_keys=True)}", flush=True)
 
     def _dialogue(self, event: dict[str, Any]) -> None:
         if not self.ai_enabled:

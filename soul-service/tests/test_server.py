@@ -2,6 +2,7 @@ import json
 import hashlib
 import hmac
 import io
+from contextlib import redirect_stdout
 from threading import Thread
 import time
 from pathlib import Path
@@ -12,6 +13,7 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 import zipfile
 
+from soulforge.providers import InferenceResult
 from soulforge.server import SoulStore, build_server
 
 
@@ -38,6 +40,25 @@ class HealthServerTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as raised:
             urlopen(f"{self.base_url}/v1/events", timeout=2)
         self.assertEqual(raised.exception.code, 404)
+
+    def test_ai_route_logs_token_counts_without_prompt_or_response_text(self) -> None:
+        self.server.provider_gateway.generate = lambda *args, **kwargs: InferenceResult(
+            "private generated response",
+            {"input_tokens": 21, "cached_input_tokens": 3, "output_tokens": 8,
+             "reasoning_tokens": 2, "total_tokens": 31},
+        )
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = self.server._route_generation("dialogue", "private prompt text")
+        log = output.getvalue()
+        self.assertEqual(result, "private generated response")
+        self.assertIn('\"event\":\"ai_call\"', log)
+        self.assertIn('\"route\":\"dialogue\"', log)
+        self.assertIn('\"input_tokens\":21', log)
+        self.assertIn('\"output_tokens\":8', log)
+        self.assertIn('\"total_tokens\":31', log)
+        self.assertNotIn("private prompt text", log)
+        self.assertNotIn("private generated response", log)
 
     def test_signed_event_is_accepted_and_deduplicated(self) -> None:
         event_id = str(uuid4())
@@ -125,7 +146,10 @@ class HealthServerTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
             files = archive.namelist()
             source = archive.read("SoulforgeCommander/SoulforgeCommander.lua").decode()
+            toc = archive.read("SoulforgeCommander/SoulforgeCommander.toc").decode()
         self.assertNotIn("SoulforgeCommander/Companions.lua", files)
+        self.assertIn("SoulforgeCommander/Bindings.xml", files)
+        self.assertIn("Bindings.xml", toc.splitlines())
         self.assertNotIn("Firstbot", source)
         self.assertIn(".soulforge roster", source)
 

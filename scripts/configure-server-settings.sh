@@ -54,6 +54,11 @@ fi
 
 set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MinRandomBots "${SOULFORGE_RANDOM_BOTS:-500}"
 set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MaxRandomBots "${SOULFORGE_RANDOM_BOTS:-500}"
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.ReactDelay 250
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.RandomBotUpdateInterval 30
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.RandomBotsPerInterval 25
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.DisabledWithoutRealPlayer 1
+set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.DisabledWithoutRealPlayerLoginDelay 30
 set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.MaxAddedBots "${SOULFORGE_MAX_ADDED_BOTS:-40}"
 set_config runtime/azerothcore/etc/modules/playerbots.conf AiPlayerbot.RandomBotMaxLevel 19
 set_config runtime/azerothcore/etc/modules/progression_system.conf ProgressionSystem.Bracket_0 1

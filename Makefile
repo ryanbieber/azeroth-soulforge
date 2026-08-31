@@ -1,12 +1,15 @@
 COMPOSE ?= docker compose
 
-.PHONY: doctor setup up down status logs models account backup firewall verify
+.PHONY: doctor setup bots up down status logs models account backup firewall verify
 
 doctor:
 	./scripts/check-host.sh
 
 setup:
 	./scripts/setup-source.sh
+
+bots:
+	COMPOSE="$(COMPOSE)" ./scripts/app-up.sh --bots-only
 
 up:
 	COMPOSE="$(COMPOSE)" ./scripts/app-up.sh

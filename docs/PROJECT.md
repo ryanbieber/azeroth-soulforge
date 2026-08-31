@@ -107,6 +107,13 @@ Startup applies the pinned Auction House Bot world schema through a one-time
 migration ledger. It adopts an already complete schema but refuses to replace
 an incomplete schema automatically because the upstream base SQL is
 destructive.
+The first `make up` runs an idempotent Playerbots prewarm before authentication
+is exposed. A maintenance-only worldserver creates the configured population,
+waits for every bot to log in, flushes generated state, records the prepared
+population in private runtime state, and stops. Normal world starts keep random
+bots offline until a human connects, then admit them in bounded background
+batches after a short grace period. `make bots` exposes the same prewarm as an
+explicit stopped-server operation.
 The core retains its complete level-80 stat tables because lowering
 `MaxPlayerLevel` below the Death Knight start level makes AzerothCore abort.
 The active progression brackets gate content, while the Playerbots-specific
@@ -625,3 +632,78 @@ another world's example character names.
 **Consequence:** The client addon remains external-network-free and
 credential-free. It is installed once, server roster changes synchronize without
 a new download, and players can configure who Assemble invites from inside WoW.
+
+### 2026-08-31 — Keep random-bot login batches responsive
+
+**Decision:** Seed `AiPlayerbot.ReactDelay` at 250 ms,
+`AiPlayerbot.RandomBotUpdateInterval` at 30 seconds, and
+`AiPlayerbot.RandomBotsPerInterval` at 25 while retaining the independently
+configurable total random-bot population.
+
+**Reason:** Live comparison with the prior installation showed that the pinned
+Playerbots stack remained responsive to a real client's world login with these
+values, while the fresh defaults evaluated each bot 2.5 times as often and used
+60-bot asynchronous batches that starved the realm-to-character-selection
+handoff during a fresh 700-bot startup.
+
+**Consequence:** Large populations take longer to reach their target after a
+worldserver restart and individual bot reactions may be up to 150 ms later,
+but authentication, character selection, and world responsiveness retain
+priority.
+
+### 2026-08-31 — Prewarm bots before exposing player login
+
+**Decision:** Make the first `make up` prepare durable Playerbot state in a
+maintenance-only world, expose the workflow separately as `make bots`, and keep
+random bots offline until a human connects during normal operation.
+
+**Reason:** First-login bot generation performs substantial character-database
+work. Running it before authserver starts prevents that work from competing with
+the owner's realm-to-character-selection handshake.
+
+**Consequence:** Initial setup takes longer and reports bot progress explicitly.
+The prewarm is idempotent for an unchanged or smaller configured population,
+normal shutdown retains its private completion marker and database state, and a
+larger population causes the preparation phase to run again.
+
+### 2026-08-31 — Size MySQL for a populated private realm
+
+**Decision:** Run MySQL with a 4 GiB configurable InnoDB buffer pool, flush redo
+logs once per second, and disable per-transaction binary-log synchronization.
+
+**Reason:** Live diagnosis of a fresh 700-bot realm found MySQL still using its
+128 MiB default after 16.7 million uncached InnoDB page reads and 932,163
+fsyncs. The resulting database churn stretched paced bot startup and left 932
+character writes queued during shutdown.
+
+**Consequence:** Bot state and world tables remain cached on suitably sized
+hosts, while `SOULFORGE_DB_BUFFER_POOL_SIZE` supports smaller deployments. A
+machine or container crash can lose up to roughly one second of recent database
+work; normal shutdown still drains all committed work.
+
+### 2026-08-31 — Make the Commander package directly discoverable
+
+**Decision:** Load `Bindings.xml` from Soulforge Commander's TOC and document
+the exact extracted client path in the dashboard and setup guide.
+
+**Reason:** WoW 3.3.5a ignores ZIP files and addons nested below an extra folder,
+and a binding file omitted from the TOC cannot register the command-wheel key.
+
+**Consequence:** The addon appears when extracted to
+`Interface/AddOns/SoulforgeCommander`, and its hold-to-open binding is available
+without editing client files.
+
+### 2026-08-31 — Expose safe AI usage telemetry
+
+**Decision:** Emit one structured `ai_call` line after every director or
+dialogue inference and return a 24-hour hourly usage series to AI Studio. Logs
+and the plot separate input and output tokens; logs also include provider,
+model, status, latency, cached input, reasoning, and total tokens.
+
+**Reason:** Operators need to correlate world activity with paid inference,
+understand usage over time instead of reading only a cumulative number, and
+diagnose slow or unexpectedly expensive routes from ordinary container logs.
+
+**Consequence:** Prompts, generated text, character conversations, and provider
+credentials remain excluded from operational logs and chart data. Monthly
+totals and estimated spend remain available alongside the rolling plot.

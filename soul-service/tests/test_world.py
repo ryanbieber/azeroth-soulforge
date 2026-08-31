@@ -58,6 +58,10 @@ class WorldRepositoryTests(unittest.TestCase):
         summary = self.worlds.usage_summary()
         self.assertEqual(summary["total_tokens"], 1100)
         self.assertEqual(summary["estimated_cost_micros"], 3000)
+        self.assertEqual(len(summary["series"]), 24)
+        self.assertEqual(summary["series"][-1]["input_tokens"], 1000)
+        self.assertEqual(summary["series"][-1]["output_tokens"], 100)
+        self.assertEqual(summary["series"][-1]["requests"], 1)
 
     def test_kill_switch_and_optional_cap_persist(self) -> None:
         state = self.worlds.save_ai_state({"enabled": False, "monthly_cap_micros": 500_000,
