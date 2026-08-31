@@ -30,7 +30,7 @@ for path in "${required[@]}"; do
   test -f "$path" || { echo "missing required file: $path" >&2; exit 1; }
 done
 
-rg -qx 'Bindings\.xml' addons/SoulforgeCommander/SoulforgeCommander.toc || {
+grep -qx 'Bindings\.xml' addons/SoulforgeCommander/SoulforgeCommander.toc || {
   echo "Soulforge Commander TOC does not load Bindings.xml" >&2
   exit 1
 }
