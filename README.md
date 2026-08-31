@@ -104,9 +104,12 @@ gameplay action—the language model is only a social layer.
 The dashboard also packages **Soulforge Commander**, a 3.3.5a addon with a
 hold-to-open radial command wheel. Map one button, move the mouse toward Follow,
 Stay, Flee, Attack, Tank Pull, Rebuff, or Reset, and release. The installed
+addon also supports a press-only controller mode: press once and flick a
+cursor-mapped stick toward a direction to execute immediately, without dwelling
+or clicking. The installed
 addon synchronizes the active world's companion roster in game and
 provides a panel to enable, disable, add, or remove local entries. Companion
-changes never require another download. Extract the download and verify the
+roster changes never require another download; addon code upgrades do. Extract the download and verify the
 client contains exactly
 `Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc`; WoW cannot load
 the ZIP itself or discover a folder nested another level down.

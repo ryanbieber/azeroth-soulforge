@@ -8,6 +8,9 @@ Soulforge Commander for World of Warcraft 3.3.5a
 4. In WoW Key Bindings, map "Hold command wheel" under Soulforge Commander.
 5. Hold that keyboard/controller button, move the mouse toward a command, and
    release the button to execute it. Clicking a command works too.
+   If your controller mapper or action-bar macro can only toggle on press, use
+   /sfc: press once, then flick the cursor-mapped stick toward a command. It
+   executes as soon as the stick crosses the wheel, with no dwell or click.
 6. Use the mouse wheel while the command wheel is open to cycle Everyone,
    role targets, and individual party or raid members. Right-click cancels.
    Type /sfc as a fallback.

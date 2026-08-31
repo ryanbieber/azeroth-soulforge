@@ -805,3 +805,35 @@ recognizable part of city life rather than narrowing unrelated realm-wide chat.
 an ambient reply there from a same-zone candidate. Moving out of a trade-enabled
 city removes channel access through normal game rules; the Soul Service does not
 make Trade available independently.
+
+### 2026-08-31 — Add immediate press-and-flick controller selection
+
+**Decision:** Preserve hold, aim, and release for bindings that expose key-down
+and key-up, and add a toggle mode for `/sfc` or press-only controller mappings.
+In toggle mode, moving the cursor-mapped stick past the radial threshold executes
+the selected direction immediately; a second press can still confirm a partially
+highlighted command.
+
+**Reason:** Some controller mappers and action-bar macros expose only a press,
+leaving the wheel open and requiring a mouse click even though the player has
+already aimed at a radial command.
+
+**Consequence:** Both input styles remain user initiated. WoW 3.3.5a still needs
+the aiming stick mapped to cursor movement. The selection vector is measured from
+the cursor's opening position so screen-edge wheel clamping does not skew aim.
+Clients must install addon 1.2.0 once because executable addon code cannot
+synchronize like companion roster data.
+
+### 2026-08-31 — Resolve Soul Service dynamically at the HTTPS gateway
+
+**Decision:** Configure nginx to resolve `soul-service` through Docker's embedded
+DNS with a five-second validity instead of caching the container IP at gateway
+startup.
+
+**Reason:** Rebuilding Soul Service assigned a new Compose-network address while
+the long-running gateway retained the old address, leaving HTTPS health checks
+at 502 even after Soul Service became healthy.
+
+**Consequence:** Future Soul Service recreation no longer requires a gateway
+restart to restore the dashboard. The bridge API remains private and the gateway
+continues publishing only the authenticated control plane.

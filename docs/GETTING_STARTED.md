@@ -202,10 +202,16 @@ enable it at character selection, then map
 the mapped keyboard or controller button, aim the mouse toward Follow, Attack,
 Tank pull, Flee, Reset, Rebuff, or Stay, and release. Use the mouse wheel while
 aiming to select everyone, a role, or one companion; right-click cancels. Use
+the direct binding when the controller mapper emits button-down and button-up.
+For press-only mapping, put `/sfc` on an action button, map the aiming stick to
+cursor movement, press once, and flick toward a command. It executes as soon as
+the stick crosses the radial threshold, without a dwell or another click. Use
 **Companions** on the wheel to view the server roster, enable or disable entries,
 add a local character name, or sync immediately. Use **Assemble** after login to
 add every enabled companion to the party. Future server-side companion changes
 sync automatically and never require reinstalling or downloading the addon.
+Addon code upgrades, including controller flick mode, require replacing the
+installed addon folder once.
 
 The forged companions receive deep-memory profiles automatically. Each
 profile is materialized inside Soul Service as:

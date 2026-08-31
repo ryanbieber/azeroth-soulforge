@@ -278,6 +278,10 @@ class HealthServerTests(unittest.TestCase):
         self.assertIn("Bindings.xml", toc.splitlines())
         self.assertNotIn("Firstbot", source)
         self.assertIn(".soulforge roster", source)
+        self.assertIn('wheelMode == "flick"', source)
+        self.assertIn("distance >= flickThreshold", source)
+        self.assertIn("originX, originY", source)
+        self.assertIn("## Version: 1.2.0", toc)
 
         roster = self._signed_get("/v1/companion-roster?realm_id=azeroth-soulforge")
         self.assertEqual(roster["companions"], [

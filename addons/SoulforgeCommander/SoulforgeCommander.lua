@@ -16,6 +16,8 @@ local actions = {
   { label = "Stay", command = "stay" },
 }
 local scopeIndex, selectedIndex = 1, nil
+local wheelMode, originX, originY = "hold", nil, nil
+local deadzone, flickThreshold = 28, 58
 local assembleQueue, assembleElapsed = {}, 0
 local companions, pendingRoster = {}, nil
 local configPanel, syncDelay
@@ -140,13 +142,17 @@ end
 
 local function setSelected(index)
   if selectedIndex == index then return end
-  if selectedIndex then wheel.buttons[selectedIndex]:UnlockHighlight() end
+  if selectedIndex then
+    wheel.buttons[selectedIndex]:UnlockHighlight()
+    wheel.buttons[selectedIndex]:SetAlpha(0.82)
+  end
   selectedIndex = index
   if selectedIndex then
     wheel.buttons[selectedIndex]:LockHighlight()
+    wheel.buttons[selectedIndex]:SetAlpha(1)
     wheel.selection:SetText(actions[selectedIndex].label)
   else
-    wheel.selection:SetText("Move to choose")
+    wheel.selection:SetText(wheelMode == "flick" and "FLICK TO COMMAND" or "MOVE TO CHOOSE")
   end
 end
 
@@ -154,25 +160,30 @@ local function trackMouse()
   local scale = UIParent:GetEffectiveScale()
   local mouseX, mouseY = GetCursorPosition()
   mouseX, mouseY = mouseX / scale, mouseY / scale
+  local dx, dy = mouseX - originX, mouseY - originY
+  local distanceFromOrigin = (dx ^ 2 + dy ^ 2) ^ 0.5
+  if distanceFromOrigin < deadzone then setSelected(nil); return distanceFromOrigin end
   local centerX, centerY = wheel:GetCenter()
-  local distanceFromCenter = ((mouseX - centerX) ^ 2 + (mouseY - centerY) ^ 2) ^ 0.5
-  if distanceFromCenter < 34 then setSelected(nil); return end
+  local projectedX, projectedY = centerX + dx, centerY + dy
   local nearest, nearestDistance = nil, nil
   for index, button in ipairs(wheel.buttons) do
     local x, y = button:GetCenter()
-    local distance = (mouseX - x) ^ 2 + (mouseY - y) ^ 2
+    local distance = (projectedX - x) ^ 2 + (projectedY - y) ^ 2
     if not nearestDistance or distance < nearestDistance then
       nearest, nearestDistance = index, distance
     end
   end
   setSelected(nearest)
+  return distanceFromOrigin
 end
 
-local function openWheel()
+local function openWheel(mode)
+  wheelMode = mode or "hold"
   rebuildScopes()
   local scale = UIParent:GetEffectiveScale()
   local x, y = GetCursorPosition()
-  local radius = 155
+  originX, originY = x / scale, y / scale
+  local radius = 175
   x = math.max(radius * scale, math.min(x, (UIParent:GetWidth() - radius) * scale))
   y = math.max(radius * scale, math.min(y, (UIParent:GetHeight() - radius) * scale))
   wheel:ClearAllPoints()
@@ -186,17 +197,21 @@ local function closeWheel(execute)
   wheel:Hide()
   if execute and action then issue(action.command) end
   setSelected(nil)
+  wheelMode, originX, originY = "hold", nil, nil
 end
 
-wheel:SetWidth(300)
-wheel:SetHeight(300)
+wheel:SetWidth(340)
+wheel:SetHeight(340)
 wheel:SetFrameStrata("DIALOG")
 wheel:EnableMouse(true)
 wheel:EnableMouseWheel(true)
 wheel:SetBackdrop({ bgFile = "Interface/Tooltips/UI-Tooltip-Background", edgeFile = "Interface/Tooltips/UI-Tooltip-Border", edgeSize = 18, insets = { left = 5, right = 5, top = 5, bottom = 5 } })
 wheel:SetBackdropColor(0.025, 0.04, 0.055, 0.92)
 wheel:SetScript("OnUpdate", function(_, elapsed)
-  if wheel:IsShown() then trackMouse() end
+  if wheel:IsShown() then
+    local distance = trackMouse()
+    if wheelMode == "flick" and selectedIndex and distance >= flickThreshold then closeWheel(true) end
+  end
   updateAssembly(elapsed)
 end)
 wheel:SetScript("OnMouseWheel", function(_, delta)
@@ -210,9 +225,13 @@ wheel:SetScript("OnMouseDown", function(_, button)
 end)
 wheel.buttons = {}
 
+wheel.title = wheel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+wheel.title:SetPoint("TOP", 0, -20)
+wheel.title:SetText("SOULFORGE COMMANDER")
+
 wheel.center = CreateFrame("Button", nil, wheel, "UIPanelButtonTemplate")
-wheel.center:SetWidth(88)
-wheel.center:SetHeight(35)
+wheel.center:SetWidth(104)
+wheel.center:SetHeight(38)
 wheel.center:SetPoint("CENTER", 0, 0)
 wheel.center:SetScript("OnClick", function()
   scopeIndex = scopeIndex + 1
@@ -220,17 +239,22 @@ wheel.center:SetScript("OnClick", function()
   updateCenter()
 end)
 
-wheel.selection = wheel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+wheel.selection = wheel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 wheel.selection:SetPoint("TOP", wheel.center, "BOTTOM", 0, -5)
-wheel.selection:SetText("Move to choose")
+wheel.selection:SetText("MOVE TO CHOOSE")
+
+wheel.help = wheel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+wheel.help:SetPoint("BOTTOM", 0, 18)
+wheel.help:SetText("Release to command  |  Right-click to cancel")
 
 for index, action in ipairs(actions) do
   local angle = math.rad(90 - ((index - 1) * (360 / #actions)))
   local button = CreateFrame("Button", nil, wheel, "UIPanelButtonTemplate")
-  button:SetWidth(82)
-  button:SetHeight(30)
-  button:SetPoint("CENTER", wheel, "CENTER", math.cos(angle) * 105, math.sin(angle) * 105)
+  button:SetWidth(94)
+  button:SetHeight(34)
+  button:SetPoint("CENTER", wheel, "CENTER", math.cos(angle) * 122, math.sin(angle) * 122)
   button:SetText(action.label)
+  button:SetAlpha(0.82)
   button:SetScript("OnEnter", function() setSelected(index) end)
   button:SetScript("OnClick", function() closeWheel(false); issue(action.command) end)
   wheel.buttons[index] = button
@@ -432,20 +456,20 @@ end
 
 function SoulforgeCommander_Binding(state)
   if state == "down" then
-    openWheel()
+    openWheel("hold")
   elseif state == "up" then
     closeWheel(true)
   elseif wheel:IsShown() then
-    closeWheel(false)
+    closeWheel(selectedIndex ~= nil)
   else
-    openWheel()
+    openWheel("flick")
   end
   SoulforgeCommanderDB = SoulforgeCommanderDB or {}
   SoulforgeCommanderDB.scopeIndex = scopeIndex
 end
 
 function SoulforgeCommander_Toggle()
-  if wheel:IsShown() then closeWheel(false) else openWheel() end
+  if wheel:IsShown() then closeWheel(selectedIndex ~= nil) else openWheel("flick") end
 end
 
 SLASH_SOULFORGECOMMANDER1 = "/sfc"
