@@ -15,7 +15,7 @@ import zipfile
 from unittest.mock import patch
 
 from soulforge.providers import InferenceResult
-from soulforge.server import SoulStore, build_server
+from soulforge.server import SoulStore, build_server, normalize_chat_reply
 
 
 class HealthServerTests(unittest.TestCase):
@@ -60,6 +60,24 @@ class HealthServerTests(unittest.TestCase):
         self.assertIn('\"total_tokens\":31', log)
         self.assertNotIn("private prompt text", log)
         self.assertNotIn("private generated response", log)
+
+    def test_chat_reply_is_literal_character_text_not_narration(self) -> None:
+        self.assertEqual(
+            normalize_chat_reply('**Companion:** "I am ready. Let us move."', "Companion"),
+            "I am ready. Let us move.",
+        )
+        self.assertEqual(
+            normalize_chat_reply("*adjusts armor* Need a tank for Deadmines?", "Companion"),
+            "Need a tank for Deadmines?",
+        )
+        self.assertEqual(
+            normalize_chat_reply("Companion smiles and looks toward the road.", "Companion"),
+            "",
+        )
+        self.assertEqual(
+            normalize_chat_reply("LFG [Rupture] spam, pst", "Roadwarrior"),
+            "LFG [Rupture] spam, pst",
+        )
 
     def test_signed_event_is_accepted_and_deduplicated(self) -> None:
         event_id = str(uuid4())
@@ -132,6 +150,7 @@ class HealthServerTests(unittest.TestCase):
         self.assertEqual(observed["purpose"], "ambient")
         self.assertIn("The Barrens", observed["prompt"])
         self.assertIn("2004-2009-era", observed["prompt"])
+        self.assertIn("exact words Roadwarrior would type into the WoW chat box", observed["prompt"])
         reply = self.server.store.pending("test", 5)[0]
         self.assertEqual(reply["channel"], "channel")
         self.assertEqual(reply["channel_name"], "General - The Barrens")
@@ -143,6 +162,7 @@ class HealthServerTests(unittest.TestCase):
         self.assertIn("Your character skill document", preview["prompt"])
         self.assertIn("Immutable world canon", preview["prompt"])
         self.assertIn("Recent memories", preview["prompt"])
+        self.assertIn("exact words Companion would type into the WoW chat box", preview["prompt"])
 
     def test_admin_session_requires_password_and_csrf(self) -> None:
         with self.assertRaises(HTTPError) as raised:

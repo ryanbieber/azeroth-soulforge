@@ -107,6 +107,7 @@ class WorldRepositoryTests(unittest.TestCase):
         self.assertIsNotNone(prompt)
         self.assertIn("The autumn moon watches every oath", prompt[2])
         self.assertIn("A bell rings beneath Goldshire", prompt[2])
+        self.assertIn("exact words Tank would type into the WoW chat box", prompt[2])
 
         self.store.complete(event, "I heard it under the road stones.")
         pending = self.store.pending("azeroth-soulforge", 10)

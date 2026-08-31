@@ -40,6 +40,44 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def normalize_chat_reply(text: str, speaker: str) -> str:
+    """Return literal in-game chat text, never model narration or a speaker label."""
+    reply = str(text).strip()
+    reply = re.sub(r"^```(?:text)?\s*", "", reply, flags=re.IGNORECASE)
+    reply = re.sub(r"\s*```$", "", reply).strip()
+    if not reply:
+        return ""
+    name = re.escape(str(speaker).strip())
+    cleaned: list[str] = []
+    narrative = re.compile(
+        rf"^(?:{name}|he|she|they)\s+(?:laughs?|smiles?|grins?|sighs?|nods?|shrugs?|"
+        r"turns?|looks?|thinks?|says?|replies?|asks?|exclaims?|whispers?)\b",
+        re.IGNORECASE,
+    )
+    for raw_line in reply.splitlines():
+        line = raw_line.strip()
+        line = re.sub(
+            rf"^(?:\*\*)?(?:\[{name}\]|{name})\s*(?::\s*(?:\*\*)?|\*\*\s*:)\s*",
+            "", line, flags=re.IGNORECASE,
+        ).strip()
+        line = re.sub(r"^(?:assistant|character|response)\s*:\s*", "", line,
+                      flags=re.IGNORECASE).strip()
+        line = re.sub(r"^\*[^*\n]{1,160}\*\s*", "", line).strip()
+        line = re.sub(r"^\([^()\n]{1,160}\)\s*", "", line).strip()
+        if not line:
+            continue
+        if narrative.match(line):
+            return ""
+        quote_pairs = (("\"", "\""), ("“", "”"), ("'", "'"))
+        for opening, closing in quote_pairs:
+            if len(line) >= 2 and line.startswith(opening) and line.endswith(closing):
+                line = line[len(opening):-len(closing)].strip()
+                break
+        if line:
+            cleaned.append(line)
+    return "\n".join(cleaned).strip()
+
+
 class SoulStore:
     def __init__(self, path: str) -> None:
         self.path = path
@@ -194,7 +232,10 @@ class SoulStore:
             f"You are {name}, a persistent World of Warcraft companion—not an AI assistant. "
             f"Archetype: {profile['archetype']}. Voice: {profile['voice']}. "
             f"Values: {profile['values_text']}. Stay in character, never claim consciousness, "
-            "never issue gameplay commands, and answer in at most 3 short sentences.\n"
+            "never issue gameplay commands, and answer in at most 3 short sentences. "
+            f"Output only the exact words {name} would type into the WoW chat box, speaking as {name} "
+            "in first person. Never include a speaker label, quotation marks around the reply, narration, "
+            "stage directions, emotes, or descriptions of actions, expressions, or tone.\n"
             f"Your character skill document:\n{guidance}\n"
             f"Immutable world canon:\n{canon_text}\n"
             f"Shared world history:\n{world_memory_text}\n"
@@ -396,7 +437,10 @@ class SoulStore:
             f"You are {profile['name']}, a persistent World of Warcraft companion—not an AI assistant. "
             f"Archetype: {profile['archetype']}. Voice: {profile['voice']}. "
             f"Values: {profile['values_text']}. Stay in character, never claim consciousness, "
-            "never issue gameplay commands, and answer in at most 3 short sentences.\n"
+            "never issue gameplay commands, and answer in at most 3 short sentences. "
+            f"Output only the exact words {profile['name']} would type into the WoW chat box, speaking as "
+            f"{profile['name']} in first person. Never include a speaker label, quotation marks around the "
+            "reply, narration, stage directions, emotes, or descriptions of actions, expressions, or tone.\n"
             f"Your character skill document:\n{guidance}\n"
             f"Immutable world canon:\n{canon_text}\n"
             f"Shared world history:\n{shared_text}\n"
@@ -756,7 +800,9 @@ class SoulforgeServer(ThreadingHTTPServer):
         if prompt_data is None:
             return
         _, _, prompt = prompt_data
-        reply = self._route_generation("dialogue", prompt)
+        reply = normalize_chat_reply(
+            self._route_generation("dialogue", prompt), event["participants"][0]["name"]
+        )
         if reply and self.ai_enabled:
             world_id = self.store.complete(event, reply)
             if event.get("channel") in {"party", "raid", "guild"}:
@@ -792,10 +838,13 @@ class SoulforgeServer(ThreadingHTTPServer):
             "LFG/trade chatter, arguments, local jokes, rumors, typos, playful item-or-spell-link wordplay, or "
             "occasional nonsense. Barrens chat may be especially chaotic. Do not force a famous meme every time. "
             f"{event['actor']['name']} says: {event['text'][:300]}\n"
-            "Reply naturally in one or two short chat lines, usually under 45 words. Never mention AI, prompts, "
+            f"Output only the exact words {bot['name']} would type into the WoW chat box, speaking as "
+            f"{bot['name']} in first person. Reply naturally in one or two short chat lines, usually under "
+            "45 words. Do not add a speaker label, quotation marks around the reply, narration, stage "
+            "directions, emotes, or descriptions of actions, expressions, or tone. Never mention AI, prompts, "
             "or servers, and never issue a bot-control command. Return [silence] if replying would feel forced."
         )
-        reply = self._route_generation("ambient", prompt).strip()
+        reply = normalize_chat_reply(self._route_generation("ambient", prompt), bot["name"])
         if not reply or reply.lower() == "[silence]":
             self.store.dismiss(event["event_id"])
             return
@@ -825,10 +874,13 @@ class SoulforgeServer(ThreadingHTTPServer):
             return
         prompt = prompt_data[2] + (
             "\nReply as a witty in-character party interjection to the other companion. "
-            "Keep it to one or two short sentences, add personality rather than exposition, "
-            "and do not issue gameplay commands."
+            "Keep it to one or two short sentences and add personality rather than exposition. "
+            "Output only the literal first-person words this companion types into party chat—no name label, "
+            "narration, stage directions, emotes, action descriptions, or gameplay commands."
         )
-        reply = self._route_generation("dialogue", prompt)
+        reply = normalize_chat_reply(
+            self._route_generation("dialogue", prompt), str(responder["name"])
+        )
         if reply and self.ai_enabled:
             self.store.enqueue_proactive(
                 f"{event['event_id']}:banter", event["realm_id"], str(responder["bot_guid"]),

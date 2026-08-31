@@ -43,6 +43,12 @@ and asks for era-appropriate, zone-specific realm culture without storing deep
 personal memory for disposable population bots. AI Studio exposes the route,
 reply chance, cooldown, and per-companion prompt previews.
 
+Companion, ambient, and companion-to-companion prompts request only the literal
+first-person words the character would type into WoW chat. A final delivery
+guard removes speaker labels, wrapping quotation marks, and leading emotes, and
+suppresses narration or third-person stage directions rather than displaying
+them in game.
+
 Run its tests from the repository root with `./scripts/verify.sh` or directly:
 
 ```bash

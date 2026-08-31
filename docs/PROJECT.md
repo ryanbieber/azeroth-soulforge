@@ -741,3 +741,18 @@ each human say or public-channel line. Most events are dismissed before
 inference, generated messages cannot re-enter capture, and ambient bots do not
 accumulate deep memories. AI Studio controls the ambient route, chance, and
 cooldown and can preview each companion's bounded assembled prompt.
+
+### 2026-08-31 — Deliver model dialogue as literal character chat
+
+**Decision:** Require companion, ambient, and banter routes to return only the
+first-person words the character would type into the WoW chat box. Normalize
+speaker labels, wrapping quotes, and leading emotes before delivery, and suppress
+outputs that still begin as third-person narration or stage direction.
+
+**Reason:** General role-play instructions can cause a model to narrate a
+character, label its answer, or describe an action instead of speaking as the
+character. Those formats look artificial when injected into WoW chat.
+
+**Consequence:** In-game replies read as ordinary player messages. A malformed
+narrative response is silently discarded instead of being shown, and item or
+spell references such as `[Rupture]` remain ordinary chat text.
