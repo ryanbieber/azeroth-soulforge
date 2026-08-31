@@ -10,8 +10,9 @@ port-forwarding or expose it to the public internet. You must provide a legally
 obtained World of Warcraft 3.3.5a build 12340 client; the repository cannot
 provide Blizzard software or extracted game assets.
 
-The local language model supplies companion dialogue only. Playerbots controls
-combat, movement, quests, inventory, groups, and all other gameplay.
+Language models supply companion dialogue and occasional ambient realm chatter
+only. Playerbots controls combat, movement, quests, inventory, groups, and all
+other gameplay.
 
 ## 2. Prepare the host
 
@@ -114,9 +115,11 @@ game services. World time advances only while a human player is online.
 The dashboard also manages bot population, companions, gameplay rates, and AI
 routing. In **AI Studio**, local Ollama and paid OpenAI, Anthropic, Gemini, or
 compatible providers can be configured separately for world direction and
-companion dialogue. Provider keys are encrypted server-side and never returned
-to the browser. Set an optional monthly cap and use the global switch to stop
-new AI calls. Do not publish this dashboard through a router or public tunnel.
+companion dialogue, while a small local model handles zone-aware ambient chat.
+The ambient chance and global cooldown are configurable. Provider keys are
+encrypted server-side and never returned to the browser. Set an optional monthly
+cap and use the global switch to stop new AI calls. Do not publish this dashboard
+through a router or public tunnel.
 
 Under **Settings → Gameplay rates**, multipliers from 0.1×–10× control XP,
 reputation, item loot, money drops, and honor. Profession skill gain accepts
