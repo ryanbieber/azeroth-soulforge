@@ -12,6 +12,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 import zipfile
+from unittest.mock import patch
 
 from soulforge.providers import InferenceResult
 from soulforge.server import SoulStore, build_server
@@ -108,6 +109,40 @@ class HealthServerTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "channel name"):
             self.server.RequestHandlerClass._validate_event(event)
+
+    def test_ambient_random_bot_uses_small_route_without_personal_memory(self) -> None:
+        event = {
+            "event_id": str(uuid4()), "realm_id": "test", "event_type": "chat.channel",
+            "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+            "participants": [{"guid": "99", "kind": "playerbot", "name": "Roadwarrior"}],
+            "channel": "channel", "text": "anyone know where Mankrik is?",
+            "context": {"dialogue_tier": "ambient", "channel_name": "General - The Barrens",
+                        "zone_name": "The Barrens", "zone_id": 17},
+            "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+        }
+        self.server.store.accept(event, json.dumps(event))
+        self.server.worlds.save_ai_state({"ambient_reply_percent": 25, "ambient_cooldown_seconds": 5})
+        observed = {}
+        def generate(purpose, prompt):
+            observed.update(purpose=purpose, prompt=prompt)
+            return "check near the quilboar camps, unless chat sends you to Thunder Bluff again"
+        self.server._route_generation = generate
+        with patch("soulforge.server.secrets.randbelow", return_value=0):
+            self.server._ambient_dialogue(event)
+        self.assertEqual(observed["purpose"], "ambient")
+        self.assertIn("The Barrens", observed["prompt"])
+        self.assertIn("2004-2009-era", observed["prompt"])
+        reply = self.server.store.pending("test", 5)[0]
+        self.assertEqual(reply["channel"], "channel")
+        self.assertEqual(reply["channel_name"], "General - The Barrens")
+        self.assertEqual(self.server.store.souls(), [])
+
+    def test_companion_prompt_preview_shows_bounded_layers(self) -> None:
+        self.server.store.seed_soul("test", "2", "Companion")
+        preview = self.server.store.prompt_preview("test", "2")
+        self.assertIn("Your character skill document", preview["prompt"])
+        self.assertIn("Immutable world canon", preview["prompt"])
+        self.assertIn("Recent memories", preview["prompt"])
 
     def test_admin_session_requires_password_and_csrf(self) -> None:
         with self.assertRaises(HTTPError) as raised:

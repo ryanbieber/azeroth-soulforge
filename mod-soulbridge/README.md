@@ -7,6 +7,14 @@ channel chat. Replies return through the originating chat destination. A bounded
 free of network, database, and inference work; worker threads own signed HTTP
 transport, polling, acknowledgement, and retry.
 
+For human-authored `/say` and public-channel lines that do not address a
+companion, the bridge may select one same-faction random Playerbot in the same
+zone as an ambient-dialogue candidate. `/say` candidates must also be within 60
+yards. The event carries the zone and channel name to the Soul Service, which
+applies its probability and global cooldown before any inference. Generated bot
+messages are rejected by the capture hooks, so ambient chatter cannot create a
+bot-to-bot reply chain.
+
 Soulforge Commander can issue `.soulforge roster` as an ordinary player. The
 command only queues an internal signed roster request. Soulbridge resolves it on
 the worker thread and returns machine-readable system messages on the world

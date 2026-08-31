@@ -65,10 +65,15 @@ class WorldRepositoryTests(unittest.TestCase):
 
     def test_kill_switch_and_optional_cap_persist(self) -> None:
         state = self.worlds.save_ai_state({"enabled": False, "monthly_cap_micros": 500_000,
-                                           "auto_stop_minutes": 15})
+                                           "auto_stop_minutes": 15, "ambient_enabled": True,
+                                           "ambient_reply_percent": 7, "ambient_cooldown_seconds": 45})
         self.assertFalse(state["enabled"])
         self.assertEqual(state["monthly_cap_micros"], 500_000)
         self.assertEqual(state["auto_stop_minutes"], 15)
+        self.assertEqual(state["ambient_reply_percent"], 7)
+        self.assertEqual(state["ambient_cooldown_seconds"], 45)
+        self.assertEqual(self.worlds.routes()["ambient"]["model"], "qwen3:1.7b")
+        self.assertEqual(self.worlds.routes()["ambient"]["max_tokens"], 96)
 
     def test_group_selection_respects_faction(self) -> None:
         self.assertEqual(companion_roles("tank"), ["healer", "dps", "dps", "dps"])

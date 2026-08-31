@@ -284,6 +284,34 @@ class SoulStore:
         self._materialize_skill(realm, guid)
         return compact_world_id
 
+    def complete_ambient(self, event: dict[str, Any], reply: str) -> None:
+        soul = event["participants"][0]
+        now = utc_now()
+        expires = (datetime.now(timezone.utc) + timedelta(minutes=5)).replace(
+            microsecond=0
+        ).isoformat().replace("+00:00", "Z")
+        channel = str(event.get("channel", "say"))
+        channel_name = str(event.get("context", {}).get("channel_name", ""))[:128]
+        connection = self.connect()
+        connection.execute(
+            """INSERT OR IGNORE INTO outbox
+               (reply_id,source_event_id,realm_id,bot_guid,recipient_guid,channel,
+                channel_name,text,created_at,expires_at,trace_id)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+            (str(uuid4()), event["event_id"], event["realm_id"], str(soul["guid"]),
+             str(event["actor"]["guid"]), channel, channel_name, reply[:280], now,
+             expires, event["trace"]["trace_id"]),
+        )
+        connection.execute("UPDATE events SET status='complete' WHERE event_id=?", (event["event_id"],))
+        connection.commit()
+        self.close(connection)
+
+    def dismiss(self, event_id: str) -> None:
+        connection = self.connect()
+        connection.execute("UPDATE events SET status='ignored' WHERE event_id=?", (event_id,))
+        connection.commit()
+        self.close(connection)
+
     def enqueue_proactive(self, source_id: str, realm: str, bot_guid: str,
                           recipient_guid: str, text: str, channel: str = "whisper",
                           channel_name: str = "") -> None:
@@ -338,6 +366,44 @@ class SoulStore:
         ).fetchall()
         self.close(connection)
         return [dict(row) for row in rows]
+
+    def prompt_preview(self, realm: str, guid: str) -> dict[str, str] | None:
+        connection = self.connect()
+        profile = connection.execute(
+            "SELECT * FROM souls WHERE realm_id=? AND bot_guid=?", (realm, guid)
+        ).fetchone()
+        if not profile:
+            self.close(connection)
+            return None
+        memories = connection.execute(
+            "SELECT role,text FROM memories WHERE realm_id=? AND bot_guid=? ORDER BY id DESC LIMIT 12",
+            (realm, guid),
+        ).fetchall()[::-1]
+        world = connection.execute(
+            "SELECT canon_json FROM worlds WHERE realm_id=? AND active=1 LIMIT 1", (realm,)
+        ).fetchone()
+        world_memories = [] if not world else connection.execute(
+            """SELECT kind,text FROM world_memories WHERE world_id=(
+                 SELECT id FROM worlds WHERE realm_id=? AND active=1 LIMIT 1)
+               AND redacted=0 ORDER BY id DESC LIMIT 12""", (realm,)
+        ).fetchall()[::-1]
+        self.close(connection)
+        guidance = profile["skill_document"] or self._default_guidance(profile["name"])
+        memory_text = "\n".join(f"{row['role']}: {row['text']}" for row in memories) or "No prior memories yet."
+        shared_text = "\n".join(f"{row['kind']}: {row['text']}" for row in world_memories) or "No shared world history yet."
+        canon_text = world["canon_json"] if world else "No world canon has been forged."
+        prompt = (
+            f"You are {profile['name']}, a persistent World of Warcraft companion—not an AI assistant. "
+            f"Archetype: {profile['archetype']}. Voice: {profile['voice']}. "
+            f"Values: {profile['values_text']}. Stay in character, never claim consciousness, "
+            "never issue gameplay commands, and answer in at most 3 short sentences.\n"
+            f"Your character skill document:\n{guidance}\n"
+            f"Immutable world canon:\n{canon_text}\n"
+            f"Shared world history:\n{shared_text}\n"
+            f"Recent memories:\n{memory_text}\n"
+            "[Player name] says in [chat channel]: [new message]"
+        )
+        return {"name": profile["name"], "prompt": prompt}
 
     def seed_soul(self, realm: str, guid: str, name: str) -> dict[str, Any]:
         connection = self.connect()
@@ -572,7 +638,8 @@ class SoulforgeServer(ThreadingHTTPServer):
             f"development-only:{admin_password}:{secret}"
         )
         self.provider_gateway = ProviderGateway(SecretCipher(master_key))
-        self.worlds = WorldRepository(store, self.ollama_url, self.model)
+        self.ambient_model = os.environ.get("SOULFORGE_AMBIENT_MODEL", "qwen3:1.7b")
+        self.worlds = WorldRepository(store, self.ollama_url, self.model, self.ambient_model)
         bootstrap_key = os.environ.get("SOULFORGE_OPENAI_API_KEY", "").strip()
         if bootstrap_key and not self.worlds.provider("openai-primary"):
             base_url = os.environ.get("SOULFORGE_OPENAI_BASE_URL", "https://api.openai.com").rstrip("/")
@@ -597,6 +664,8 @@ class SoulforgeServer(ThreadingHTTPServer):
         self._last_presence_tick = time.monotonic()
         self._empty_since: float | None = None
         self._auto_stop_fired = False
+        self._ambient_lock = Lock()
+        self._last_ambient_reply = 0.0
         if start_worker:
             Thread(target=self._worker, daemon=True, name="soulforge-inference").start()
             Thread(target=self._presence_monitor, daemon=True, name="soulforge-presence").start()
@@ -680,6 +749,9 @@ class SoulforgeServer(ThreadingHTTPServer):
     def _dialogue(self, event: dict[str, Any]) -> None:
         if not self.ai_enabled:
             return
+        if event.get("context", {}).get("dialogue_tier") == "ambient":
+            self._ambient_dialogue(event)
+            return
         prompt_data = self.store.build_prompt(event)
         if prompt_data is None:
             return
@@ -691,6 +763,43 @@ class SoulforgeServer(ThreadingHTTPServer):
                 self._banter_followup(event, reply)
             if world_id:
                 self.jobs.put_nowait({"kind": "memory_compaction", "world_id": world_id})
+
+    def _ambient_dialogue(self, event: dict[str, Any]) -> None:
+        state = self.worlds.ai_state()
+        if not state["ambient_enabled"] or event.get("channel") not in {"say", "channel"}:
+            self.store.dismiss(event["event_id"])
+            return
+        now = time.monotonic()
+        with self._ambient_lock:
+            if now - self._last_ambient_reply < state["ambient_cooldown_seconds"]:
+                self.store.dismiss(event["event_id"])
+                return
+            if secrets.randbelow(100) >= state["ambient_reply_percent"]:
+                self.store.dismiss(event["event_id"])
+                return
+            self._last_ambient_reply = now
+        bot = event["participants"][0]
+        context = event.get("context", {})
+        zone = str(context.get("zone_name") or "Azeroth")[:80]
+        channel_name = str(context.get("channel_name") or event["channel"])[:128]
+        world = self.worlds.active_world() or {}
+        canon = world.get("canon") or {}
+        flavor = str(canon.get("regional_flavor") or canon.get("tone") or canon.get("premise") or "classic Azeroth")[:240]
+        prompt = (
+            f"You are {bot['name']}, an ordinary player on a busy 2004-2009-era World of Warcraft realm. "
+            f"You are in {zone}, reading {channel_name}. World flavor: {flavor}. "
+            "Make the realm feel inhabited: react like a real player of that era with zone-aware quest help, "
+            "LFG/trade chatter, arguments, local jokes, rumors, typos, playful item-or-spell-link wordplay, or "
+            "occasional nonsense. Barrens chat may be especially chaotic. Do not force a famous meme every time. "
+            f"{event['actor']['name']} says: {event['text'][:300]}\n"
+            "Reply naturally in one or two short chat lines, usually under 45 words. Never mention AI, prompts, "
+            "or servers, and never issue a bot-control command. Return [silence] if replying would feel forced."
+        )
+        reply = self._route_generation("ambient", prompt).strip()
+        if not reply or reply.lower() == "[silence]":
+            self.store.dismiss(event["event_id"])
+            return
+        self.store.complete_ambient(event, reply)
 
     def _banter_followup(self, event: dict[str, Any], first_reply: str) -> None:
         companions = self.worlds.companions()
@@ -938,6 +1047,18 @@ class SoulHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/admin/v1/world/companions":
             if self._admin_session():
                 self._json(HTTPStatus.OK, {"companions": self.server.worlds.companions()})
+        elif parsed.path.startswith("/admin/v1/world/companions/") and parsed.path.endswith("/prompt"):
+            if not self._admin_session():
+                return
+            parts = parsed.path.split("/")
+            world = self.server.worlds.active_world()
+            preview = None if not world or len(parts) != 7 else self.server.store.prompt_preview(
+                world["realm_id"], parts[5]
+            )
+            if preview:
+                self._json(HTTPStatus.OK, preview)
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
         elif parsed.path.startswith("/admin/v1/jobs/"):
             if not self._admin_session():
                 return
@@ -1453,8 +1574,12 @@ class SoulHandler(BaseHTTPRequestHandler):
         for key in ("event_id", "realm_id", "event_type", "actor", "participants", "channel", "text", "trace"):
             if key not in event:
                 raise ValueError(f"missing {key}")
-        if not event["participants"] or event["participants"][0].get("kind") != "soul":
-            raise ValueError("first participant must be a soul")
+        if not event["participants"]:
+            raise ValueError("one chat participant is required")
+        participant_kind = event["participants"][0].get("kind")
+        tier = event.get("context", {}).get("dialogue_tier") if isinstance(event.get("context", {}), dict) else None
+        if participant_kind != "soul" and not (participant_kind == "playerbot" and tier == "ambient"):
+            raise ValueError("first participant must be a soul or ambient playerbot")
         if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", str(event["realm_id"])):
             raise ValueError("invalid realm identity")
         for character in [event["actor"], *event["participants"]]:

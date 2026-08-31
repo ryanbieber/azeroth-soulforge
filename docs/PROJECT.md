@@ -724,3 +724,20 @@ only human-authored messages enter the inference path, public-channel replies
 require the bot to be present in that channel, and generated output cannot
 trigger another event. Chat capture remains a bounded enqueue on the world
 thread; all HTTP and inference work stays on workers.
+
+### 2026-08-31 — Split deep companions from ambient realm chatter
+
+**Decision:** Keep forged companions on the high-quality dialogue route and add
+a separate local ambient route using `qwen3:1.7b`, a 96-token ceiling, a five
+percent default reply chance, and a 30-second global cooldown. Ambient prompts
+receive the current zone and public channel but no personal-memory transcript.
+
+**Reason:** A convincing classic realm needs occasional zone-aware chatter from
+ordinary population bots, but applying the companion model and deep context to
+every public line would waste tokens and make a 1,000-bot realm noisy.
+
+**Consequence:** At most one eligible same-faction random bot is considered for
+each human say or public-channel line. Most events are dismissed before
+inference, generated messages cannot re-enter capture, and ambient bots do not
+accumulate deep memories. AI Studio controls the ambient route, chance, and
+cooldown and can preview each companion's bounded assembled prompt.

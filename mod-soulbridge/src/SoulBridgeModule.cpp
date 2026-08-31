@@ -4,6 +4,7 @@
  */
 
 #include "Config.h"
+#include "DBCStores.h"
 #include "Channel.h"
 #include "ChannelMgr.h"
 #include "Chat.h"
@@ -16,6 +17,7 @@
 #include "Player.h"
 #include "PlayerScript.h"
 #include "Playerbots.h"
+#include "RandomPlayerbotMgr.h"
 #include "ScriptMgr.h"
 #include "WorldScript.h"
 
@@ -33,6 +35,7 @@
 #include <iterator>
 #include <mutex>
 #include <optional>
+#include <random>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -112,6 +115,30 @@ Player* MentionedControlledBot(Player* player, std::string const& message)
             return bot;
     }
     return nullptr;
+}
+
+Player* AmbientRandomBot(Player* player, bool nearby)
+{
+    if (!player)
+        return nullptr;
+    std::vector<Player*> candidates;
+    for (auto iterator = sRandomPlayerbotMgr.GetPlayerBotsBegin();
+         iterator != sRandomPlayerbotMgr.GetPlayerBotsEnd(); ++iterator)
+    {
+        Player* bot = iterator->second;
+        if (!bot || !GET_PLAYERBOT_AI(bot) || bot->GetTeamId() != player->GetTeamId() ||
+            bot->GetZoneId() != player->GetZoneId())
+            continue;
+        if (nearby && !bot->IsWithinDistInMap(player, 60.0f))
+            continue;
+        candidates.push_back(bot);
+    }
+    if (candidates.empty())
+        return nullptr;
+    static std::mt19937 generator(static_cast<unsigned>(
+        std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::uniform_int_distribution<std::size_t> choice(0, candidates.size() - 1);
+    return candidates[choice(generator)];
 }
 
 std::optional<std::string> JsonStringField(std::string const& document, std::string const& key, std::size_t start)
@@ -222,6 +249,10 @@ public:
             channel = "raid";
         else if (type == CHAT_MSG_CHANNEL)
             channel = "channel";
+        bool ambient = sRandomPlayerbotMgr.IsRandomBot(bot->GetGUID().GetCounter());
+        std::string zoneName = "Unknown zone";
+        if (AreaTableEntry const* zone = sAreaTableStore.LookupEntry(player->GetZoneId()))
+            zoneName = zone->area_name[LOCALE_enUS];
         std::ostringstream payload;
         payload << "{\"schema_version\":\"1.0\",\"event_id\":\"" << eventId
                 << "\",\"realm_id\":\"" << JsonEscape(_realmId)
@@ -230,11 +261,14 @@ public:
                 << "\",\"actor\":{\"guid\":\"" << player->GetGUID().GetCounter()
                 << "\",\"kind\":\"human\",\"name\":\"" << JsonEscape(player->GetName())
                 << "\"},\"participants\":[{\"guid\":\"" << bot->GetGUID().GetCounter()
-                << "\",\"kind\":\"soul\",\"name\":\"" << JsonEscape(bot->GetName())
+                << "\",\"kind\":\"" << (ambient ? "playerbot" : "soul")
+                << "\",\"name\":\"" << JsonEscape(bot->GetName())
                 << "\"}],\"channel\":\"" << channel << "\",\"text\":\"" << JsonEscape(message)
                 << "\",\"context\":{\"target_bot_guid\":\"" << bot->GetGUID().GetCounter()
                 << "\",\"target_bot_name\":\"" << JsonEscape(bot->GetName())
-                << "\"";
+                << "\",\"dialogue_tier\":\"" << (ambient ? "ambient" : "companion")
+                << "\",\"zone_id\":" << player->GetZoneId()
+                << ",\"zone_name\":\"" << JsonEscape(zoneName) << "\"";
         if (!channelName.empty())
             payload << ",\"channel_name\":\"" << JsonEscape(channelName) << "\"";
         payload << "},\"trace\":{\"trace_id\":\"" << traceId
@@ -622,8 +656,12 @@ public:
     bool OnPlayerCanUseChat(Player* player, uint32 type, uint32, std::string& message) override
     {
         if (type == CHAT_MSG_SAY && player && !GET_PLAYERBOT_AI(player))
+        {
             if (Player* bot = MentionedControlledBot(player, message))
                 Bridge::Instance().Enqueue(player, bot, type, message);
+            else if (Player* bot = AmbientRandomBot(player, true))
+                Bridge::Instance().Enqueue(player, bot, type, message);
+        }
         return true;
     }
 
@@ -672,8 +710,12 @@ public:
     bool OnPlayerCanUseChat(Player* player, uint32 type, uint32, std::string& message, Channel* channel) override
     {
         if (type == CHAT_MSG_CHANNEL && player && !GET_PLAYERBOT_AI(player) && channel)
+        {
             if (Player* bot = MentionedControlledBot(player, message))
                 Bridge::Instance().Enqueue(player, bot, type, message, channel->GetName());
+            else if (Player* bot = AmbientRandomBot(player, false))
+                Bridge::Instance().Enqueue(player, bot, type, message, channel->GetName());
+        }
         return true;
     }
 };

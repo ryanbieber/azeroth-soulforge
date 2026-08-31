@@ -51,6 +51,12 @@ paths:
     post:
       summary: Promote an existing Playerbot to a deep-memory companion
       responses: {"201": {description: Companion promoted}}
+  /world/companions/{bot_guid}/prompt:
+    get:
+      summary: Preview the authenticated companion chat prompt and its bounded context
+      parameters:
+        - {name: bot_guid, in: path, required: true, schema: {type: string, pattern: "^[1-9][0-9]{0,19}$"}}
+      responses: {"200": {description: Assembled prompt preview}, "404": {description: Unknown companion}}
   /world/actions/{action}:
     post:
       summary: Enter or leave the persistent world
@@ -81,17 +87,17 @@ paths:
       responses: {"200": {description: Provider connected}, "400": {description: Test failed}}
   /ai/routing:
     get:
-      summary: Return separate director and dialogue model routes
+      summary: Return separate director, companion-dialogue, and ambient-bot model routes
       responses: {"200": {description: AI routes}}
     put:
-      summary: Replace director and dialogue model routes
+      summary: Replace director, companion-dialogue, and ambient-bot model routes
       responses: {"200": {description: AI routes saved}}
   /ai/state:
     get:
-      summary: Return the global AI switch, optional monthly cap, and auto-pause delay
+      summary: Return global safeguards plus ambient reply probability and cooldown
       responses: {"200": {description: AI safeguards}}
     put:
-      summary: Update the global AI switch, optional monthly cap, or auto-pause delay
+      summary: Update global safeguards or ambient reply controls
       responses: {"200": {description: AI safeguards saved}}
   /ai/usage:
     get:

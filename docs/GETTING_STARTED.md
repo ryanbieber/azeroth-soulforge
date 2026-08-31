@@ -53,9 +53,10 @@ Edit `.env` and replace every placeholder:
 | `SOULFORGE_CONTROL_SECRET` | Authenticates the internal control agent; use at least 32 characters |
 | `SOULFORGE_ADMIN_PASSWORD` | Dashboard sign-in; use at least 12 characters and keep it unique |
 | `SOULFORGE_SECRETS_KEY` | Encrypts provider API keys at rest; use a unique random value of at least 24 characters |
-| `SOULFORGE_OPENAI_API_KEY` | Optional first-boot OpenAI key; skips the local model download and imports into encrypted provider storage |
+| `SOULFORGE_OPENAI_API_KEY` | Optional first-boot OpenAI key; uses paid AI for companions/directing while keeping the small ambient model local |
 | `SOULFORGE_OPENAI_BASE_URL` | Optional OpenAI endpoint; a trailing `/v1` is normalized |
 | `SOULFORGE_OPENAI_MODEL` | Optional first-boot OpenAI model for direction and dialogue |
+| `SOULFORGE_AMBIENT_MODEL` | Local low-cost world-chat model; defaults to `qwen3:1.7b` |
 | `SOULFORGE_GAME_USERNAME` | WoW client login name |
 | `SOULFORGE_GAME_PASSWORD` | WoW 3.3.5a login password; 8–16 letters and numbers |
 | `SOULFORGE_LAN_IP` | Stable address of the server host |
@@ -79,8 +80,8 @@ ports 3724, 8085, and 8765 only from the configured trusted subnet. `make up`
 starts the whole Compose application.
 
 The first run downloads source, containers, and extracted map data, and compiles
-AzerothCore. Without a paid-provider key it also downloads the default 3.4 GB
-local model. It can take considerably longer than later starts. In another
+AzerothCore. It downloads the roughly 1.4 GB ambient chat model; without a paid
+provider key it also downloads the larger companion/director model. It can take considerably longer than later starts. In another
 terminal, monitor it with:
 
 ```bash

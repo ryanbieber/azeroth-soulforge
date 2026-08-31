@@ -24,11 +24,12 @@ def utc_now() -> str:
 
 
 class WorldRepository:
-    def __init__(self, store: Any, ollama_url: str, chat_model: str) -> None:
+    def __init__(self, store: Any, ollama_url: str, chat_model: str,
+                 ambient_model: str = "qwen3:1.7b") -> None:
         self.store = store
-        self._initialize(ollama_url, chat_model)
+        self._initialize(ollama_url, chat_model, ambient_model)
 
-    def _initialize(self, ollama_url: str, chat_model: str) -> None:
+    def _initialize(self, ollama_url: str, chat_model: str, ambient_model: str) -> None:
         connection = self.store.connect()
         connection.executescript(
             """
@@ -111,12 +112,16 @@ class WorldRepository:
                VALUES('ollama-local','Local Ollama','ollama',?,?,?)""",
             (ollama_url, now, now),
         )
-        for purpose, temperature, tokens in (("director", 0.7, 1200), ("dialogue", 0.75, 180)):
+        for purpose, model, temperature, tokens in (
+            ("director", chat_model, 0.7, 1200),
+            ("dialogue", chat_model, 0.75, 180),
+            ("ambient", ambient_model, 0.9, 96),
+        ):
             connection.execute(
                 """INSERT OR IGNORE INTO ai_routes
                    (purpose,provider_id,model,temperature,max_tokens,updated_at)
                    VALUES(?,'ollama-local',?,?,?,?)""",
-                (purpose, chat_model, temperature, tokens, now),
+                (purpose, model, temperature, tokens, now),
             )
         connection.commit()
         self.store.close(connection)
@@ -490,7 +495,7 @@ class WorldRepository:
 
     def save_routes(self, payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
         connection = self.store.connect()
-        for purpose in ("director", "dialogue"):
+        for purpose in ("director", "dialogue", "ambient"):
             if purpose not in payload:
                 continue
             route = payload[purpose]
@@ -515,6 +520,9 @@ class WorldRepository:
             "enabled": settings.get("ai_enabled", settings.get("souls_enabled", "true")) == "true",
             "monthly_cap_micros": int(settings.get("monthly_cap_micros", "0")),
             "auto_stop_minutes": int(settings.get("auto_stop_minutes", "10")),
+            "ambient_enabled": settings.get("ambient_enabled", "true") == "true",
+            "ambient_reply_percent": int(settings.get("ambient_reply_percent", "5")),
+            "ambient_cooldown_seconds": int(settings.get("ambient_cooldown_seconds", "30")),
         }
 
     def save_ai_state(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -522,15 +530,27 @@ class WorldRepository:
         enabled = payload.get("enabled", current["enabled"])
         cap = payload.get("monthly_cap_micros", current["monthly_cap_micros"])
         auto_stop = payload.get("auto_stop_minutes", current["auto_stop_minutes"])
+        ambient_enabled = payload.get("ambient_enabled", current["ambient_enabled"])
+        ambient_percent = payload.get("ambient_reply_percent", current["ambient_reply_percent"])
+        ambient_cooldown = payload.get("ambient_cooldown_seconds", current["ambient_cooldown_seconds"])
         if not isinstance(enabled, bool) or isinstance(cap, bool) or not isinstance(cap, int) or cap < 0:
             raise ValueError("invalid AI state")
         if isinstance(auto_stop, bool) or not isinstance(auto_stop, int) or not 0 <= auto_stop <= 120:
             raise ValueError("auto_stop_minutes must be between 0 and 120")
+        if not isinstance(ambient_enabled, bool):
+            raise ValueError("ambient_enabled must be boolean")
+        if isinstance(ambient_percent, bool) or not isinstance(ambient_percent, int) or not 0 <= ambient_percent <= 25:
+            raise ValueError("ambient_reply_percent must be between 0 and 25")
+        if isinstance(ambient_cooldown, bool) or not isinstance(ambient_cooldown, int) or not 5 <= ambient_cooldown <= 600:
+            raise ValueError("ambient_cooldown_seconds must be between 5 and 600")
         self.store.set_settings({
             "ai_enabled": "true" if enabled else "false",
             "souls_enabled": "true" if enabled else "false",
             "monthly_cap_micros": str(cap),
             "auto_stop_minutes": str(auto_stop),
+            "ambient_enabled": "true" if ambient_enabled else "false",
+            "ambient_reply_percent": str(ambient_percent),
+            "ambient_cooldown_seconds": str(ambient_cooldown),
         })
         return self.ai_state()
 

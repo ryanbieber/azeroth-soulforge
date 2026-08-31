@@ -31,10 +31,13 @@ $COMPOSE wait ac-db-import
 ./scripts/create-account.sh
 
 $COMPOSE up --detach ollama
+$COMPOSE exec -T ollama ollama pull "${SOULFORGE_AMBIENT_MODEL:-qwen3:1.7b}"
 if [[ -n "${SOULFORGE_OPENAI_API_KEY:-}" ]]; then
-  echo "OpenAI API key detected; skipping local Ollama model download."
+  echo "OpenAI API key detected; using local Ollama only for lightweight ambient world chatter."
 else
-  $COMPOSE exec -T ollama ollama pull "${SOULFORGE_CHAT_MODEL:-qwen3.5:4b}"
+  if [[ "${SOULFORGE_CHAT_MODEL:-qwen3.5:4b}" != "${SOULFORGE_AMBIENT_MODEL:-qwen3:1.7b}" ]]; then
+    $COMPOSE exec -T ollama ollama pull "${SOULFORGE_CHAT_MODEL:-qwen3.5:4b}"
+  fi
 fi
 
 if [[ "$MODE" == "--bots-only" ]]; then

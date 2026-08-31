@@ -50,10 +50,11 @@ make up
 ```
 
 The first launch is slow: it builds AzerothCore, initializes databases and map
-data, downloads the default 3.4 GB `qwen3.5:4b` model when paid AI is not
-configured, and prewarms the selected Playerbot population. That maintenance
-world prepares durable bot characters before opening the login server. Wait for
-`Azeroth Soulforge is ready`; later starts reuse the prepared state.
+data, downloads the roughly 1.4 GB `qwen3:1.7b` ambient-chat model, and prewarms
+the selected Playerbot population. When paid AI is not configured it also
+downloads the larger companion/director model. That maintenance world prepares
+durable bot characters before opening the login server. Wait for `Azeroth
+Soulforge is ready`; later starts reuse the prepared state.
 
 The included MySQL profile gives AzerothCore a 4 GiB InnoDB cache and batches
 redo-log durability once per second. Set `SOULFORGE_DB_BUFFER_POOL_SIZE` in
@@ -92,8 +93,11 @@ realm name and Normal/PvP/RP/RP-PvP type; choose a 1–80 starting level for new
 characters; tune Playerbot population and bounded XP, reputation, loot, money,
 honor, and profession rates; forge character
 profiles; edit each
-character’s `SKILL.md`; inspect memories; and route Ollama, OpenAI, Anthropic,
-Gemini, or OpenAI-compatible models separately for world direction and dialogue.
+character’s `SKILL.md`; preview each companion's assembled chat prompt; inspect
+memories; and route Ollama, OpenAI, Anthropic, Gemini, or OpenAI-compatible
+models separately for world direction, companion dialogue, and ambient chatter.
+Ambient replies are zone-aware, probabilistic, globally rate-limited, and do not
+receive or create deep personal memories.
 Playerbots remains responsible for every
 gameplay action—the language model is only a social layer.
 
