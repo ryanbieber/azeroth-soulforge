@@ -179,8 +179,10 @@ services:
       SOULFORGE_OPENAI_API_KEY: ${SOULFORGE_OPENAI_API_KEY:-}
       SOULFORGE_OPENAI_BASE_URL: ${SOULFORGE_OPENAI_BASE_URL:-https://api.openai.com}
       SOULFORGE_OPENAI_MODEL: ${SOULFORGE_OPENAI_MODEL:-gpt-5.6-luna}
+      SOULFORGE_CONSOLEPORT_ARCHIVE: /client-addons/ConsolePortLK-1.5.0-rc2.zip
     volumes:
       - soul-data:/data
+      - ./runtime/client-addons/ConsolePortLK-1.5.0-rc2.zip:/client-addons/ConsolePortLK-1.5.0-rc2.zip:ro
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=2)"]
       interval: 5s

@@ -59,6 +59,7 @@ runtime/azerothcore/data/
 runtime/source/
 runtime/database-init/*.sql
 runtime/database-init/*.sql.gz
+runtime/client-addons/
 *.sql.gz
 *.mpq
 

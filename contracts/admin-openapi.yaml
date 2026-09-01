@@ -103,13 +103,20 @@ paths:
     get:
       summary: Return normalized monthly totals, estimated spend, and a 24-hour hourly token series
       responses: {"200": {description: Monthly AI usage}}
-  /addon/download:
+  /addons:
     get:
-      summary: Download the generated Soulforge Commander addon archive
+      summary: Return client-addon pack readiness, pinned versions, and included folders
       responses:
         "200":
-          description: WoW 3.3.5a addon ZIP
+          description: Client-addon pack metadata; readiness describes the server package, not client installation
+  /addon/download:
+    get:
+      summary: Download the pinned ConsolePortLK and Soulforge Commander client pack
+      responses:
+        "200":
+          description: WoW 3.3.5a multi-addon ZIP
           content: {application/zip: {schema: {type: string, format: binary}}}
+        "503": {description: Pinned ConsolePortLK archive or Soulforge Commander source unavailable}
   /session:
     get:
       summary: Inspect the current authenticated session

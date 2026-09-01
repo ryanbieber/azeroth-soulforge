@@ -12,6 +12,12 @@ variables in the root `compose.yaml`. The versioned endpoints are documented in
 `contracts/openapi.yaml`; the health endpoint is `GET /health`. Dashboard
 endpoints are described separately in `contracts/admin-openapi.yaml`.
 
+The authenticated addon endpoints report package metadata and produce one
+client ZIP from the checksum-verified ConsolePortLK archive plus the repository's
+Soulforge Commander source. The third-party archive is runtime data mounted
+read-only from `runtime/client-addons`; it is never committed or served by the
+public GitHub Pages site.
+
 Provider credentials are encrypted with `SOULFORGE_SECRETS_KEY`, never returned
 through the admin API, and excluded from exports. The service describes persistent role-play identity as a "soul," but it never
 claims that the model is conscious or sentient. Model output is social text

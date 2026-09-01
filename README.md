@@ -101,18 +101,15 @@ receive or create deep personal memories.
 Playerbots remains responsible for every
 gameplay action—the language model is only a social layer.
 
-The dashboard also packages **Soulforge Commander**, a 3.3.5a addon with a
-hold-to-open radial command wheel. Map one button, move the mouse toward Follow,
-Stay, Flee, Attack, Tank Pull, Rebuff, or Reset, and release. The installed
-addon also supports a press-only controller mode: press once and flick a
-cursor-mapped stick toward a direction to execute immediately, without dwelling
-or clicking. The installed
-addon synchronizes the active world's companion roster in game and
-provides a panel to enable, disable, add, or remove local entries. Companion
-roster changes never require another download; addon code upgrades do. Extract the download and verify the
-client contains exactly
-`Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc`; WoW cannot load
-the ZIP itself or discover a folder nested another level down.
+The dashboard provides one **Client Addons** pack containing pinned
+ConsolePortLK 1.5.0-rc2 and **Soulforge Commander**. Soulforge Commander is a
+ConsolePort plugin: its managed ring contains Follow, Stay, Attack, Tank Pull,
+Flee, Reset, Rebuff, and Companions. The companion segment opens a
+controller-navigable roster where the active world's companions can be synced,
+enabled, targeted, and assembled. Names are never baked into the addon, so
+roster changes do not require another download. Extract every top-level folder
+directly into `Interface/AddOns` and verify both `ConsolePort/ConsolePort.toc`
+and `SoulforgeCommander/SoulforgeCommander.toc` exist there.
 
 ## Important safety notes
 
@@ -132,7 +129,7 @@ in [Playerbots Party Hotkeys](docs/PLAYERBOT_HOTKEYS.md) as a fallback.
 ## Repository map
 
 - `dashboard/` — React administration client.
-- `addons/SoulforgeCommander/` — hold-to-open radial Playerbots command wheel.
+- `addons/SoulforgeCommander/` — ConsolePortLK command-ring and companion plugin.
 - `soul-service/` — authenticated APIs, local inference, memory, and profiles.
 - `mod-soulbridge/` — asynchronous AzerothCore event/reply bridge.
 - `control-agent/` — internal allowlisted lifecycle/configuration boundary.

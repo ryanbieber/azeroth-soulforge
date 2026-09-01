@@ -237,16 +237,18 @@ or container API. The browser never receives any infrastructure secret.
 The dashboard's Home page is the everyday control surface: prompted-world state,
 human presence, world playtime, Enter/Leave controls, service state, companion
 status, AI kill switch, active director/dialogue routes, normalized token usage,
-and estimated spend. World, Companions, AI Studio, Addon, and Advanced pages
+and estimated spend. World, Companions, AI Studio, Client Addons, and Advanced pages
 separate story continuity from infrequent administration. API credentials are
 encrypted at rest and never returned to the browser. Progression controls remain
 absent until backup verification and restore testing are automated.
 
-The repository ships Soulforge Commander, an optional 3.3.5a addon. The owner
-maps one key/controller button to a hold-to-open radial wheel, moves the mouse to
-select a Playerbots order, and releases to execute. The addon has no network or
-AI authority and every command remains user initiated. General macros remain a
-troubleshooting fallback.
+The repository ships Soulforge Commander as a required ConsolePortLK 1.5.0-rc2
+plugin. Setup downloads the exact checksum-pinned upstream archive into ignored
+runtime storage, and the authenticated dashboard assembles it with Soulforge
+Commander as one client pack. The plugin registers a managed ConsolePort ring
+for seven Playerbots orders plus a controller-navigable Companions panel. It has
+no network or AI authority and every command remains user initiated. General
+macros remain a troubleshooting fallback.
 
 Bridge requests require a shared-secret signature, timestamp window,
 nonce/replay protection, size limits, and strict schema validation. MariaDB,
@@ -283,7 +285,7 @@ only when existing consumers remain safe.
 | Dashboard | Alpha | Authenticated HTTPS React control plane and safe admin workflows |
 | Prompted fresh world | Alpha | Immutable seed, canon, dungeon group and narrative plans persist |
 | Provider routing and usage | Alpha | Local/paid adapters, kill switch and usage ledger pass tests |
-| Soulforge Commander | Alpha | Radial command addon packaged by the authenticated dashboard |
+| Soulforge Commander | Alpha | Pinned ConsolePortLK plugin and combined client pack pass automated checks; physical-client smoke pending |
 | Public setup documentation | Complete | Beginner guide deploys through GitHub Pages |
 | Progression integration | Alpha | Initial level-19 phase configured; later unlock workflow pending |
 | Guild acceptance | Not started | Eight-hour, 40-soul soak criteria pass |
@@ -837,3 +839,32 @@ at 502 even after Soul Service became healthy.
 **Consequence:** Future Soul Service recreation no longer requires a gateway
 restart to restore the dashboard. The bridge API remains private and the gateway
 continues publishing only the authenticated control plane.
+
+### 2026-08-31 — Integrate Commander as a pinned ConsolePort client pack
+
+**Decision:** Replace Soulforge Commander's standalone radial implementation
+with a required ConsolePortLK plugin. Pin ConsolePortLK 1.5.0-rc2 at commit
+`994793729ca4a5b97e87df7ce6b986ec2a370d55` and release-archive SHA-256
+`9ee20bb1f3c5c5b8d45fcc5980a07bb90d49a707e120613453177c05fea6497f`.
+Download it during setup into ignored runtime storage and combine its eight addon
+folders with Soulforge Commander only through the authenticated local dashboard.
+
+**Reason:** ConsolePort already owns the calibrated radial input, utility-ring
+presentation, focus navigation, and controller configuration needed by the 3.3.5a
+client. A plugin keeps Soulforge focused on Playerbots commands and the active
+world's dynamic companion roster instead of maintaining a parallel input system.
+
+**Consequence:** The fixed Soulforge ring contains Follow, Stay, Attack, Tank
+Pull, Flee, Reset, Rebuff, and Companions; Assemble lives in the companion panel.
+There is no standalone fallback wheel. Companion data still synchronizes without
+a redownload, but code changes require replacing the client addon folders. The
+third-party Artistic-2.0 notice remains in `ConsolePort/LICENSE.md`; GitHub Pages
+documents installation but does not host the pack. Automated archive, Lua,
+service, contract, and dashboard checks are required before release; physical
+controller testing in a WoW client remains explicitly pending until recorded.
+The cached archive is mode `0644` so the unprivileged Soul Service container can
+read its bind mount without granting write access.
+On 2026-08-31, `./scripts/setup-client-addons.sh` verified the exact release
+archive and `./scripts/verify.sh` passed 26 Soul Service tests, 13 control-agent
+tests, static-site validation, the React production build, Lua parsing, Compose
+validation, and the Soulbridge C++ build/test on the current Linux host.

@@ -22,16 +22,16 @@ required=(
   docs/GETTING_STARTED.md docs/PLAYERBOT_HOTKEYS.md site/index.html site/assets/styles.css
   site/assets/app.js site/.nojekyll .github/workflows/pages.yml
   scripts/validate-pages.py
+  scripts/setup-client-addons.sh scripts/validate-consoleport-archive.py
   addons/SoulforgeCommander/SoulforgeCommander.toc
   addons/SoulforgeCommander/SoulforgeCommander.lua
-  addons/SoulforgeCommander/Bindings.xml
 )
 for path in "${required[@]}"; do
   test -f "$path" || { echo "missing required file: $path" >&2; exit 1; }
 done
 
-grep -qx 'Bindings\.xml' addons/SoulforgeCommander/SoulforgeCommander.toc || {
-  echo "Soulforge Commander TOC does not load Bindings.xml" >&2
+grep -qx '## RequiredDeps: ConsolePort' addons/SoulforgeCommander/SoulforgeCommander.toc || {
+  echo "Soulforge Commander does not declare its ConsolePort dependency" >&2
   exit 1
 }
 
@@ -51,7 +51,7 @@ for marker in ("openapi: 3.1.0", "/v1/events:", "/v1/outbox:", "components:"):
         raise SystemExit(f"contracts/openapi.yaml: missing {marker!r}")
 
 admin = Path("contracts/admin-openapi.yaml").read_text(encoding="utf-8")
-for marker in ("openapi: 3.1.0", "/session:", "/world/forge:", "/ai/providers:", "/addon/download:", "/server/settings:", "/models/pull:", "/skill:"):
+for marker in ("openapi: 3.1.0", "/session:", "/world/forge:", "/ai/providers:", "/addons:", "/addon/download:", "/server/settings:", "/models/pull:", "/skill:"):
     if marker not in admin:
         raise SystemExit(f"contracts/admin-openapi.yaml: missing {marker!r}")
 PY
@@ -63,13 +63,13 @@ PYTHONDONTWRITEBYTECODE=1 \
   python3 -m unittest discover -s control-agent/tests -v
 
 PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile \
-  scripts/validate-skill-inference.py
+  scripts/validate-skill-inference.py scripts/validate-consoleport-archive.py
 
 python3 scripts/validate-pages.py
 
 npm --prefix dashboard ci --ignore-scripts
 npm --prefix dashboard run build
-npm --prefix dashboard exec -- luaparse --file addons/SoulforgeCommander/SoulforgeCommander.lua --quiet
+./dashboard/node_modules/.bin/luaparse addons/SoulforgeCommander/SoulforgeCommander.lua >/dev/null
 
 docker compose --env-file .env.example -f compose.yaml config --quiet
 

@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: Soulforge Commander
-## Notes: User-initiated GUI controls for a Playerbots dungeon group.
+## Notes: ConsolePortLK command ring and companion manager for Playerbots.
 ## Author: Azeroth Soulforge contributors
-## Version: 1.2.0
+## Version: 2.0.0
+## RequiredDeps: ConsolePort
 ## SavedVariables: SoulforgeCommanderDB
 SoulforgeCommander.lua
-Bindings.xml

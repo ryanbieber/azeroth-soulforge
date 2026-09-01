@@ -260,30 +260,56 @@ class HealthServerTests(unittest.TestCase):
             {"name": "Firstbot", "role": "tank"}, {"name": "Secondbot", "role": "healer"},
         ]
         self.server.worlds.active_world = lambda: {"realm_id": "azeroth-soulforge"}
-        _, headers = self._request(
-            "POST", "/admin/v1/session", {"password": "test-admin-password"}, include_headers=True
-        )
-        cookie = headers["Set-Cookie"].split(";", 1)[0]
-        request = Request(
-            f"{self.base_url}/admin/v1/addon/download", headers={"Cookie": cookie}
-        )
-        with urlopen(request, timeout=2) as response:
-            archive_bytes = response.read()
-        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
-            files = archive.namelist()
-            source = archive.read("SoulforgeCommander/SoulforgeCommander.lua").decode()
-            toc = archive.read("SoulforgeCommander/SoulforgeCommander.toc").decode()
-        self.assertNotIn("SoulforgeCommander/Companions.lua", files)
-        self.assertIn("SoulforgeCommander/Bindings.xml", files)
-        self.assertIn("Bindings.xml", toc.splitlines())
-        self.assertNotIn("Firstbot", source)
-        self.assertIn(".soulforge roster", source)
-        self.assertIn('wheelMode == "flick"', source)
-        self.assertIn("distance >= flickThreshold", source)
-        self.assertIn("originX, originY", source)
-        self.assertIn("Flick to command", source)
-        self.assertNotIn("selectionElapsed", source)
-        self.assertIn("## Version: 1.2.0", toc)
+        roots = {
+            "ConsolePort", "ConsolePortAdvanced", "ConsolePortBar", "ConsolePortHelp",
+            "ConsolePortKeyboard", "ConsolePortLoader", "ConsolePortUI_Loot", "ConsolePortUI_Menu",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            consoleport = Path(directory) / "ConsolePortLK.zip"
+            with zipfile.ZipFile(consoleport, "w") as fixture:
+                for root in roots:
+                    fixture.writestr(f"{root}/{root}.toc", "## Interface: 30300\n")
+                fixture.writestr("ConsolePort/LICENSE.md", "Artistic License 2.0 fixture")
+            self.server.consoleport_archive = consoleport
+            self.server.consoleport_sha256 = hashlib.sha256(consoleport.read_bytes()).hexdigest()
+
+            _, headers = self._request(
+                "POST", "/admin/v1/session", {"password": "test-admin-password"}, include_headers=True
+            )
+            cookie = headers["Set-Cookie"].split(";", 1)[0]
+            metadata, _ = self._request(
+                "GET", "/admin/v1/addons", headers={"Cookie": cookie}, include_headers=True
+            )
+            self.assertTrue(metadata["pack"]["ready"])
+            self.assertEqual(metadata["pack"]["version"], "2.0.0")
+            self.assertEqual(metadata["components"][1]["version"], "1.5.0-rc2")
+
+            request = Request(
+                f"{self.base_url}/admin/v1/addon/download", headers={"Cookie": cookie}
+            )
+            with urlopen(request, timeout=2) as response:
+                archive_bytes = response.read()
+                self.assertIn("AzerothSoulforge-ClientAddons-2.0.0.zip", response.headers["Content-Disposition"])
+            with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+                files = archive.namelist()
+                source = archive.read("SoulforgeCommander/SoulforgeCommander.lua").decode()
+                toc = archive.read("SoulforgeCommander/SoulforgeCommander.toc").decode()
+                manifest = archive.read("CLIENT-ADDONS-MANIFEST.txt").decode()
+            self.assertEqual({name.split("/", 1)[0] for name in files} - {
+                "SoulforgeCommander", "CLIENT-ADDONS-MANIFEST.txt",
+            }, roots)
+            self.assertIn("ConsolePort/LICENSE.md", files)
+            self.assertNotIn("SoulforgeCommander/Bindings.xml", files)
+            self.assertNotIn("Firstbot", source)
+            self.assertIn(".soulforge roster", source)
+            self.assertIn("ConsolePort:AddPlugin", source)
+            self.assertIn("SoulforgeManaged", source)
+            self.assertIn('action = "custom"', source)
+            self.assertIn('command = "companions"', source)
+            self.assertNotIn("wheelMode", source)
+            self.assertIn("## RequiredDeps: ConsolePort", toc)
+            self.assertIn("## Version: 2.0.0", toc)
+            self.assertIn("ConsolePortLK 1.5.0-rc2", manifest)
 
         roster = self._signed_get("/v1/companion-roster?realm_id=azeroth-soulforge")
         self.assertEqual(roster["companions"], [

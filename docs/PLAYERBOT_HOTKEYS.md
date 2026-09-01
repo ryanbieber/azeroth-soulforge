@@ -1,12 +1,12 @@
 # Playerbots party hotkeys
 
-> **Fallback workflow:** Soulforge Commander is now the primary interface. The
-> dashboard packages a hold-to-open radial command wheel with mouse-direction
-> selection. Keep these macros only for troubleshooting or commands not yet on
-> the wheel.
+> **Fallback workflow:** Soulforge Commander is now a required ConsolePortLK
+> plugin. The dashboard's single client pack installs both addons, and the
+> Soulforge ring uses ConsolePort's controller input. Keep these macros only for
+> troubleshooting or commands not present on the managed ring.
 
 The installed addon synchronizes its ordered roster from the active world after
-login. Its Companion Setup panel can enable or disable server entries and add
+login. Its controller-navigable Companions panel can enable or disable server entries and add
 local names without another download. Use **Assemble** to pace one `.playerbots
 bot add` command per enabled companion; Playerbots logs them in and invites them
 to the owner's group.

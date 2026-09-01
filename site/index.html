@@ -22,7 +22,7 @@
       <nav aria-label="Primary navigation">
         <a href="#launch">Quick start</a>
         <a href="#forge">Forge a world</a>
-        <a href="#commander">Command wheel</a>
+        <a href="#commander">Client addons</a>
         <a href="#troubleshooting">Help</a>
         <a class="repo-link" href="https://github.com/ryanbieber/azeroth-soulforge">GitHub</a>
       </nav>
@@ -161,8 +161,8 @@ Forge fresh world →</code></pre></div>
       </section>
 
       <section class="content-section" id="commander">
-        <div class="section-heading"><p class="step-number">LEAD YOUR GROUP</p><h2>A Mass Effect-style command wheel</h2><p>Extract Soulforge Commander and map one keyboard or controller button in WoW. Verify <code>Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc</code> exists; WoW cannot load the ZIP itself. It synchronizes the active world's companions through the game server.</p></div>
-        <div class="callout"><strong>Open Companion Setup</strong> to see the server roster, choose who Assemble invites, or add a local character name. No redownload is needed when companions change. Hold the mapped button, aim toward a command, and release. Press-only controller mappings can open <code>/sfc</code> and flick a cursor-mapped stick toward a command to execute immediately—no dwell or second click. Commands remain user-initiated Playerbots chat orders—the addon never gives the LLM gameplay authority. <a href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/docs/PLAYERBOT_HOTKEYS.md">Macro fallback →</a></div>
+        <div class="section-heading"><p class="step-number">LEAD YOUR GROUP</p><h2>Soulforge inside ConsolePort</h2><p>The authenticated local dashboard provides one client pack with pinned ConsolePortLK and Soulforge Commander. Extract every top-level folder into <code>Interface/AddOns</code>, restart WoW, calibrate ConsolePort, then bind the managed Soulforge Commander ring in <code>/cp config</code>.</p></div>
+        <div class="callout"><strong>Choose Companions on the ring</strong> to open a controller-navigable roster, sync the active world, select command targets, and Assemble enabled companions. Names update without another download. The public website documents the workflow but does not host client binaries. Commands remain user-initiated Playerbots chat orders—the addon never gives the LLM gameplay authority. <a href="https://github.com/ryanbieber/azeroth-soulforge/blob/main/docs/GETTING_STARTED.md#7-command-your-companion-party">Complete setup →</a></div>
       </section>
 
       <section class="content-section" id="troubleshooting">

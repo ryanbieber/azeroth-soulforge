@@ -13,6 +13,7 @@ fi
 
 ./scripts/check-host.sh
 ./scripts/setup-source.sh
+./scripts/setup-client-addons.sh
 ./scripts/preflight.sh
 set -a; . ./.env; set +a
 ./scripts/generate-dashboard-cert.sh

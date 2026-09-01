@@ -7,6 +7,7 @@ doctor:
 
 setup:
 	./scripts/setup-source.sh
+	./scripts/setup-client-addons.sh
 
 bots:
 	COMPOSE="$(COMPOSE)" ./scripts/app-up.sh --bots-only

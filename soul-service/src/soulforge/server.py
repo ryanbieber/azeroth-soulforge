@@ -16,7 +16,7 @@ import io
 import json
 import mimetypes
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from queue import Queue
 import re
 import secrets
@@ -34,6 +34,13 @@ from .providers import ProviderGateway, SecretCipher
 from .world import WorldRepository
 
 MAX_BODY = 64 * 1024
+CLIENT_PACK_VERSION = "2.0.0"
+CONSOLEPORT_VERSION = "1.5.0-rc2"
+CONSOLEPORT_SHA256 = "9ee20bb1f3c5c5b8d45fcc5980a07bb90d49a707e120613453177c05fea6497f"
+CONSOLEPORT_ROOTS = {
+    "ConsolePort", "ConsolePortAdvanced", "ConsolePortBar", "ConsolePortHelp",
+    "ConsolePortKeyboard", "ConsolePortLoader", "ConsolePortUI_Loot", "ConsolePortUI_Menu",
+}
 
 
 def utc_now() -> str:
@@ -678,6 +685,11 @@ class SoulforgeServer(ThreadingHTTPServer):
         self.control_secret = os.environ.get("SOULFORGE_CONTROL_SECRET", "test-control-secret")
         self.dashboard_dir = Path(os.environ.get("SOULFORGE_DASHBOARD_DIR", "/app/dashboard"))
         self.addon_dir = Path(os.environ.get("SOULFORGE_ADDON_DIR", "/app/addons/SoulforgeCommander"))
+        self.consoleport_archive = Path(os.environ.get(
+            "SOULFORGE_CONSOLEPORT_ARCHIVE",
+            "/client-addons/ConsolePortLK-1.5.0-rc2.zip",
+        ))
+        self.consoleport_sha256 = CONSOLEPORT_SHA256
         master_key = os.environ.get("SOULFORGE_SECRETS_KEY") or (
             f"development-only:{admin_password}:{secret}"
         )
@@ -1139,6 +1151,9 @@ class SoulHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/admin/v1/ai/usage":
             if self._admin_session():
                 self._json(HTTPStatus.OK, self.server.worlds.usage_summary())
+        elif parsed.path == "/admin/v1/addons":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, self._addon_metadata())
         elif parsed.path == "/admin/v1/addon/download":
             if self._admin_session():
                 self._addon_download()
@@ -1590,20 +1605,105 @@ class SoulHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _validated_consoleport_files(self, source: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
+        files = [item for item in source.infolist() if not item.is_dir()]
+        roots: set[str] = set()
+        names: set[str] = set()
+        for item in files:
+            candidate = PurePosixPath(item.filename)
+            if candidate.is_absolute() or ".." in candidate.parts or len(candidate.parts) < 2:
+                raise ValueError(f"unsafe ConsolePortLK path: {item.filename}")
+            mode = item.external_attr >> 16
+            if mode & 0o170000 == 0o120000:
+                raise ValueError(f"ConsolePortLK symbolic link is not allowed: {item.filename}")
+            roots.add(candidate.parts[0])
+            names.add(item.filename)
+        if roots != CONSOLEPORT_ROOTS:
+            raise ValueError("ConsolePortLK archive contains unexpected addon roots")
+        if not {"ConsolePort/ConsolePort.toc", "ConsolePort/LICENSE.md"}.issubset(names):
+            raise ValueError("ConsolePortLK archive is missing metadata or license files")
+        return files
+
+    def _consoleport_ready(self) -> bool:
+        path = self.server.consoleport_archive
+        if not path.is_file():
+            return False
+        try:
+            digest = sha256(path.read_bytes()).hexdigest()
+            if not hmac.compare_digest(digest, self.server.consoleport_sha256):
+                return False
+            with zipfile.ZipFile(path) as source:
+                self._validated_consoleport_files(source)
+        except (OSError, ValueError, zipfile.BadZipFile):
+            return False
+        return True
+
+    def _addon_metadata(self) -> dict[str, Any]:
+        return {
+            "pack": {
+                "name": "Azeroth Soulforge Client Addons",
+                "version": CLIENT_PACK_VERSION,
+                "filename": f"AzerothSoulforge-ClientAddons-{CLIENT_PACK_VERSION}.zip",
+                "interface": 30300,
+                "ready": self._consoleport_ready() and self.server.addon_dir.is_dir(),
+            },
+            "components": [
+                {
+                    "id": "soulforge-commander",
+                    "name": "Soulforge Commander",
+                    "version": CLIENT_PACK_VERSION,
+                    "folders": ["SoulforgeCommander"],
+                    "source": "Azeroth Soulforge",
+                },
+                {
+                    "id": "consoleportlk",
+                    "name": "ConsolePortLK",
+                    "version": CONSOLEPORT_VERSION,
+                    "folders": sorted(CONSOLEPORT_ROOTS),
+                    "source": "https://github.com/leoaviana/ConsolePortLK",
+                    "sha256": CONSOLEPORT_SHA256,
+                    "license": "ConsolePort/LICENSE.md",
+                },
+            ],
+        }
+
     def _addon_download(self) -> None:
         root = self.server.addon_dir
-        if not root.is_dir():
-            self._json(HTTPStatus.NOT_FOUND, {"error": "addon_not_packaged"})
+        if not root.is_dir() or not self._consoleport_ready():
+            self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "addon_not_packaged"})
             return
         buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            for path in sorted(root.iterdir()):
-                if path.is_file():
-                    archive.writestr(f"SoulforgeCommander/{path.name}", path.read_bytes())
+        try:
+            with zipfile.ZipFile(self.server.consoleport_archive) as consoleport, zipfile.ZipFile(
+                buffer, "w", compression=zipfile.ZIP_DEFLATED
+            ) as archive:
+                for item in sorted(self._validated_consoleport_files(consoleport), key=lambda value: value.filename):
+                    archive.writestr(item.filename, consoleport.read(item))
+                for path in sorted(root.rglob("*")):
+                    if path.is_file():
+                        archive.writestr(
+                            f"SoulforgeCommander/{path.relative_to(root).as_posix()}", path.read_bytes()
+                        )
+                manifest = (
+                    f"Azeroth Soulforge Client Addons {CLIENT_PACK_VERSION}\n"
+                    f"Soulforge Commander {CLIENT_PACK_VERSION}\n"
+                    f"ConsolePortLK {CONSOLEPORT_VERSION}\n"
+                    "Source: https://github.com/leoaviana/ConsolePortLK\n"
+                    f"SHA-256: {CONSOLEPORT_SHA256}\n"
+                    "ConsolePortLK license: ConsolePort/LICENSE.md\n"
+                    "ConsolePortLK is an unmodified third-party dependency and is not affiliated with Azeroth Soulforge.\n"
+                )
+                archive.writestr("CLIENT-ADDONS-MANIFEST.txt", manifest)
+        except (OSError, ValueError, zipfile.BadZipFile):
+            self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "addon_package_invalid"})
+            return
         body = buffer.getvalue()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/zip")
-        self.send_header("Content-Disposition", 'attachment; filename="SoulforgeCommander.zip"')
+        self.send_header(
+            "Content-Disposition",
+            f'attachment; filename="AzerothSoulforge-ClientAddons-{CLIENT_PACK_VERSION}.zip"',
+        )
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self._security_headers()

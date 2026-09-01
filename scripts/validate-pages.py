@@ -41,7 +41,7 @@ def main() -> None:
         raise SystemExit("site must teach generic LAN and realmlist configuration")
     for marker in (
         "SOULFORGE_SECRETS_KEY", "Forge fresh world", "60 recent messages",
-        "Mass Effect-style command wheel",
+        "Soulforge inside ConsolePort", "does not host client binaries",
     ):
         if marker not in source:
             raise SystemExit(f"site/index.html missing product direction: {marker!r}")

@@ -187,31 +187,35 @@ the server and client are on the same LAN.
 
 ## 7. Command your companion party
 
-Download **Soulforge Commander** from the dashboard once. The package contains
-no character names or credentials. After login, it requests the ordered roster
-from the active world through the game server and stores your selections in
-WoW's SavedVariables.
+Open **Client Addons** in the authenticated dashboard and download the single
+pack. It contains pinned ConsolePortLK 1.5.0-rc2 and Soulforge Commander; it
+contains no character names or credentials. Extract the ZIP first because WoW
+cannot load addon ZIP files. Copy every extracted top-level addon folder directly
+into `Interface/AddOns` and verify these exact paths exist with no extra parent:
 
-Extract the downloaded ZIP first; WoW does not load addon ZIP files. Copy the
-extracted folder directly into `Interface/AddOns` in the WoW client and verify
-that the resulting path is exactly
-`Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc` (with no extra
-`addons` or `SoulforgeCommander` directory in between). Restart the client,
-enable it at character selection, then map
-**Hold command wheel** under **Soulforge Commander** in WoW Key Bindings. Hold
-the mapped keyboard or controller button, aim the mouse toward Follow, Attack,
-Tank pull, Flee, Reset, Rebuff, or Stay, and release. Use the mouse wheel while
-aiming to select everyone, a role, or one companion; right-click cancels. Use
-the direct binding when the controller mapper emits button-down and button-up.
-For press-only mapping, put `/sfc` on an action button, map the aiming stick to
-cursor movement, press once, and flick toward a command. It executes as soon as
-the stick crosses the radial threshold, without a dwell or another click. Use
-**Companions** on the wheel to view the server roster, enable or disable entries,
-add a local character name, or sync immediately. Use **Assemble** after login to
-add every enabled companion to the party. Future server-side companion changes
-sync automatically and never require reinstalling or downloading the addon.
-Addon code upgrades, including controller flick mode, require replacing the
-installed addon folder once.
+```text
+Interface/AddOns/ConsolePort/ConsolePort.toc
+Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc
+```
+
+Fully close and restart Wow.exe, enable both addons at character selection, and
+complete ConsolePort's controller calibration. WoW 3.3.5a does not natively
+consume modern gamepad input, so use a controller mapper that exposes controller
+buttons and sticks as keyboard/mouse input; no mapper executable is distributed
+by Soulforge.
+
+Open `/cp config`, enter ConsolePort's Ring Manager, and bind the automatically
+created **Soulforge Commander** ring to one button. Hold that button, flick with
+ConsolePort's radial input toward Follow, Stay, Attack, Tank Pull, Flee, Reset,
+Rebuff, or Companions, and release. **Companions** opens a
+controller-navigable panel that requests the active world's roster. Enable or
+disable entries, choose everyone, a role, or one companion as the command target,
+then choose **Assemble enabled** to invite the party. `/sfc` opens the same panel;
+`/sfc sync` refreshes it and `/sfc status` prints integration diagnostics.
+
+Future server-side companion changes sync without reinstalling or downloading
+the pack. Only addon-code or pinned ConsolePort upgrades require replacing the
+installed folders.
 
 The forged companions receive deep-memory profiles automatically. Each
 profile is materialized inside Soul Service as:

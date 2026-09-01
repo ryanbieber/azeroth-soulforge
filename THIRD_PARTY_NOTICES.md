@@ -1,8 +1,9 @@
 # Third-Party Notices
 
-This repository is an independent integration project. It does not vendor the
-projects or model weights listed below. Operators download them separately and
-must review the license attached to the exact revision or model tag they use.
+This repository is an independent integration project. Except for the locally
+assembled client-addon pack described below, it does not vendor the projects or
+model weights listed here. Operators must review the license attached to the
+exact revision or model tag they use.
 
 | Dependency | Purpose | Upstream license at planning time |
 | --- | --- | --- |
@@ -18,6 +19,14 @@ must review the license attached to the exact revision or model tag they use.
 | Vite and React plugin | Administration UI build | MIT |
 | nginx | HTTPS reverse proxy | 2-clause BSD |
 | Docker CLI image | Internal control client | Apache-2.0 |
+| ConsolePortLK 1.5.0-rc2 | WoW 3.3.5a controller UI bundled at setup time | Artistic-2.0; notice retained at `ConsolePort/LICENSE.md` |
+
+`scripts/setup-client-addons.sh` downloads the unmodified ConsolePortLK
+1.5.0-rc2 release archive from its upstream GitHub release and accepts only
+SHA-256 `9ee20bb1f3c5c5b8d45fcc5980a07bb90d49a707e120613453177c05fea6497f`.
+The archive is not tracked in Git. The authenticated local dashboard combines
+it with Soulforge Commander while preserving the upstream license; the public
+GitHub Pages site does not host the binary pack.
 
 The dashboard may install other Ollama model tags at the operator's request.
 Operators must review the license and usage terms attached to every selected
