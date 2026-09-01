@@ -4,6 +4,7 @@
  */
 
 #include "Config.h"
+#include "Creature.h"
 #include "DBCStores.h"
 #include "Channel.h"
 #include "ChannelMgr.h"
@@ -17,6 +18,7 @@
 #include "Player.h"
 #include "PlayerScript.h"
 #include "Playerbots.h"
+#include "QuestDef.h"
 #include "RandomPlayerbotMgr.h"
 #include "ScriptMgr.h"
 #include "WorldScript.h"
@@ -271,6 +273,68 @@ public:
                 << ",\"zone_name\":\"" << JsonEscape(zoneName) << "\"";
         if (!channelName.empty())
             payload << ",\"channel_name\":\"" << JsonEscape(channelName) << "\"";
+        payload << "},\"trace\":{\"trace_id\":\"" << traceId
+                << "\",\"origin\":\"human\",\"hop_count\":0}}";
+
+        std::lock_guard<std::mutex> lock(_eventMutex);
+        if (_events.size() >= _capacity)
+        {
+            ++_dropped;
+            return;
+        }
+        _events.push_back({ payload.str() });
+    }
+
+    void EnqueueGameplay(Player* player, std::string const& eventType,
+        std::string const& summary, std::string const& detailKey = "",
+        std::string const& detailValue = "")
+    {
+        if (!_running || !player || GET_PLAYERBOT_AI(player) || eventType.empty())
+            return;
+        PlayerbotMgr* manager = GET_PLAYERBOT_MGR(player);
+        if (!manager)
+            return;
+        std::vector<Player*> companions;
+        for (auto iterator = manager->GetPlayerBotsBegin(); iterator != manager->GetPlayerBotsEnd(); ++iterator)
+        {
+            Player* bot = iterator->second;
+            if (bot && GET_PLAYERBOT_AI(bot) && companions.size() < 8)
+                companions.push_back(bot);
+        }
+        if (companions.empty())
+            return;
+
+        std::string eventId = boost::uuids::to_string(boost::uuids::random_generator()());
+        std::string traceId = boost::uuids::to_string(boost::uuids::random_generator()());
+        std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::tm timestamp{};
+        gmtime_r(&now, &timestamp);
+        std::ostringstream occurredAt;
+        occurredAt << std::put_time(&timestamp, "%Y-%m-%dT%H:%M:%SZ");
+        std::string zoneName = "Unknown zone";
+        if (AreaTableEntry const* zone = sAreaTableStore.LookupEntry(player->GetZoneId()))
+            zoneName = zone->area_name[LOCALE_enUS];
+        std::ostringstream payload;
+        payload << "{\"schema_version\":\"1.0\",\"event_id\":\"" << eventId
+                << "\",\"realm_id\":\"" << JsonEscape(_realmId)
+                << "\",\"event_type\":\"" << JsonEscape(eventType)
+                << "\",\"occurred_at\":\"" << occurredAt.str()
+                << "\",\"actor\":{\"guid\":\"" << player->GetGUID().GetCounter()
+                << "\",\"kind\":\"human\",\"name\":\"" << JsonEscape(player->GetName())
+                << "\"},\"participants\":[";
+        for (std::size_t index = 0; index < companions.size(); ++index)
+        {
+            if (index)
+                payload << ',';
+            payload << "{\"guid\":\"" << companions[index]->GetGUID().GetCounter()
+                    << "\",\"kind\":\"soul\",\"name\":\""
+                    << JsonEscape(companions[index]->GetName()) << "\"}";
+        }
+        payload << "],\"channel\":\"party\",\"text\":\"" << JsonEscape(summary)
+                << "\",\"context\":{\"zone_id\":" << player->GetZoneId()
+                << ",\"zone_name\":\"" << JsonEscape(zoneName) << "\"";
+        if (!detailKey.empty())
+            payload << ",\"" << JsonEscape(detailKey) << "\":\"" << JsonEscape(detailValue) << "\"";
         payload << "},\"trace\":{\"trace_id\":\"" << traceId
                 << "\",\"origin\":\"human\",\"hop_count\":0}}";
 
@@ -650,7 +714,12 @@ public:
         PLAYERHOOK_CAN_PLAYER_USE_PRIVATE_CHAT,
         PLAYERHOOK_CAN_PLAYER_USE_GROUP_CHAT,
         PLAYERHOOK_CAN_PLAYER_USE_GUILD_CHAT,
-        PLAYERHOOK_CAN_PLAYER_USE_CHANNEL_CHAT
+        PLAYERHOOK_CAN_PLAYER_USE_CHANNEL_CHAT,
+        PLAYERHOOK_ON_PLAYER_JUST_DIED,
+        PLAYERHOOK_ON_PLAYER_COMPLETE_QUEST,
+        PLAYERHOOK_ON_CREATURE_KILL,
+        PLAYERHOOK_ON_LEVEL_CHANGED,
+        PLAYERHOOK_ON_PLAYER_RESURRECT
     }) { }
 
     bool OnPlayerCanUseChat(Player* player, uint32 type, uint32, std::string& message) override
@@ -717,6 +786,53 @@ public:
                 Bridge::Instance().Enqueue(player, bot, type, message, channel->GetName());
         }
         return true;
+    }
+
+    void OnPlayerJustDied(Player* player) override
+    {
+        if (!player)
+            return;
+        if (PlayerbotAI* ai = GET_PLAYERBOT_AI(player))
+        {
+            Player* master = ai->GetMaster();
+            if (master && !GET_PLAYERBOT_AI(master))
+                Bridge::Instance().EnqueueGameplay(master, "character.death",
+                    player->GetName() + " fell in battle.", "subject_name", player->GetName());
+            return;
+        }
+        Bridge::Instance().EnqueueGameplay(player, "character.death",
+            player->GetName() + " fell in battle.", "subject_name", player->GetName());
+    }
+
+    void OnPlayerCompleteQuest(Player* player, Quest const* quest) override
+    {
+        if (player && !GET_PLAYERBOT_AI(player) && quest)
+            Bridge::Instance().EnqueueGameplay(player, "quest.complete",
+                player->GetName() + " completed " + quest->GetTitle() + ".",
+                "quest_id", std::to_string(quest->GetQuestId()));
+    }
+
+    void OnPlayerCreatureKill(Player* player, Creature* killed) override
+    {
+        if (player && !GET_PLAYERBOT_AI(player) && killed && (killed->IsDungeonBoss() || killed->isWorldBoss()))
+            Bridge::Instance().EnqueueGameplay(player, "boss.kill",
+                player->GetName() + " and the party defeated " + killed->GetName() + ".",
+                "boss_name", killed->GetName());
+    }
+
+    void OnPlayerLevelChanged(Player* player, uint8 oldLevel) override
+    {
+        if (player && !GET_PLAYERBOT_AI(player) && player->GetLevel() > oldLevel)
+            Bridge::Instance().EnqueueGameplay(player, "character.level",
+                player->GetName() + " reached level " + std::to_string(player->GetLevel()) + ".",
+                "new_level", std::to_string(player->GetLevel()));
+    }
+
+    void OnPlayerResurrect(Player* player, float, bool&) override
+    {
+        if (player && !GET_PLAYERBOT_AI(player))
+            Bridge::Instance().EnqueueGameplay(player, "character.resurrect",
+                player->GetName() + " returned to life.", "subject_name", player->GetName());
     }
 };
 

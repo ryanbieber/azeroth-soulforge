@@ -77,6 +77,8 @@ class WorldRepositoryTests(unittest.TestCase):
         self.assertEqual(state["ambient_cooldown_seconds"], 45)
         self.assertEqual(self.worlds.routes()["ambient"]["model"], "qwen3:1.7b")
         self.assertEqual(self.worlds.routes()["ambient"]["max_tokens"], 96)
+        self.assertEqual(self.worlds.routes()["social"]["model"], "qwen3:1.7b")
+        self.assertEqual(self.worlds.routes()["social"]["max_tokens"], 160)
 
     def test_group_selection_respects_faction(self) -> None:
         self.assertEqual(companion_roles("tank"), ["healer", "dps", "dps", "dps"])
@@ -162,6 +164,65 @@ class WorldRepositoryTests(unittest.TestCase):
         pending = self.store.pending("azeroth-soulforge", 10)
         self.assertEqual(len(pending), 1)
         self.assertEqual(pending[0]["text"], "The road has changed.")
+
+    def test_social_state_is_bounded_and_relationship_deltas_are_clamped(self) -> None:
+        self._activate_test_world()
+        self.worlds.apply_social_updates([{
+            "source_guid": "10", "target_guid": "11", "mood": "Fired Up!", "energy": 150,
+            "trust_delta": 99, "respect_delta": -99, "irritation_delta": 3,
+            "rivalry_delta": 2, "summary": "Tank admired the rescue.",
+        }])
+        social = self.worlds.social_context()
+        self.assertEqual(social["states"][0]["mood"], "firedup")
+        self.assertEqual(social["states"][0]["energy"], 100)
+        relation = social["relationships"][0]
+        self.assertEqual(relation["trust"], 55)
+        self.assertEqual(relation["respect"], 45)
+        self.assertEqual(relation["irritation"], 3)
+        self.assertTrue(self.worlds.claim_reaction("event-1", "10", 3, "boss.kill", 0))
+        self.assertFalse(self.worlds.claim_reaction("event-1", "10", 3, "boss.kill", 0))
+
+    def test_session_reflection_uses_bounded_event_summaries_and_callbacks(self) -> None:
+        self._activate_test_world()
+        transition = self.worlds.record_presence(1)
+        session_id = transition["started"]
+        for index in range(100):
+            self.worlds.record_session_event({
+                "event_id": str(uuid4()), "event_type": "quest.complete",
+                "actor": {"name": "Owner"}, "text": f"Quest {index} completed",
+                "context": {"zone_name": "Elwynn Forest"},
+            })
+        self.assertEqual(len(self.worlds.session_candidates(session_id)), 80)
+        ended = self.worlds.record_presence(0)
+        self.assertEqual(ended, {"ended": session_id})
+        self.worlds.finish_session_reflection(session_id, {
+            "summary": "The party protected Elwynn and left one lead unfinished.",
+            "memories": [{"text": "The party protected Elwynn.", "importance": 4}] * 5,
+            "unresolved": ["Return to the mine"],
+            "callbacks": [{"bot_guid": "10", "topic": "the mine",
+                           "text": "The mine still needs attention", "zone_name": "Elwynn Forest"}],
+        })
+        social = self.worlds.social_context()
+        self.assertIn("protected Elwynn", social["reflection"]["summary"])
+        self.assertEqual(len([m for m in self.worlds.memories() if m["kind"] == "session_reflection"]), 3)
+        self.assertEqual(self.worlds.session_candidates(session_id), [])
+        callback = self.worlds.claim_callback()
+        self.assertEqual(callback["bot_guid"], "10")
+        self.assertEqual(self.worlds.claim_callback()["id"], callback["id"])
+        self.assertIsNone(self.worlds.claim_callback())
+
+    def _activate_test_world(self) -> dict:
+        return self.worlds.activate_world(
+            {"seed_prompt": "A sufficiently detailed fresh realm for social tests.",
+             "faction": "alliance", "player_role": "dps"},
+            {"premise": "The road remembers.", "initial_plans": []},
+            [
+                {"guid": "10", "name": "Tank", "race": 1, "class": 1},
+                {"guid": "11", "name": "Healer", "race": 3, "class": 5},
+                {"guid": "12", "name": "Mage", "race": 7, "class": 8},
+                {"guid": "13", "name": "Rogue", "race": 4, "class": 4},
+            ], [],
+        )
 
 
 if __name__ == "__main__":

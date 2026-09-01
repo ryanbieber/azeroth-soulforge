@@ -95,6 +95,84 @@ class HealthServerTests(unittest.TestCase):
         self.assertEqual(first["status"], "accepted")
         self.assertEqual(second["status"], "duplicate")
 
+    def test_gameplay_event_is_accepted_and_routed_to_social_engine(self) -> None:
+        event = {
+            "schema_version": "1.0", "event_id": str(uuid4()), "realm_id": "test",
+            "event_type": "character.level", "occurred_at": "2026-09-01T00:00:00Z",
+            "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+            "participants": [{"guid": "2", "kind": "soul", "name": "Companion"}],
+            "channel": "party", "text": "Owner reached level 10.",
+            "context": {"new_level": "10", "zone_name": "Elwynn Forest"},
+            "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+        }
+        result = self._post_event(event)
+        self.assertEqual(result["status"], "accepted")
+        job = self.server.jobs.get_nowait()
+        self.assertEqual(job["kind"], "social_event")
+        self.assertEqual(job["event"]["event_type"], "character.level")
+
+    def test_contextual_reaction_uses_local_triage_then_deep_dialogue(self) -> None:
+        event = {
+            "event_id": str(uuid4()), "realm_id": "test", "event_type": "boss.kill",
+            "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+            "participants": [{"guid": "2", "kind": "soul", "name": "Companion"}],
+            "channel": "party", "text": "The party defeated VanCleef.", "context": {},
+            "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+        }
+        companion = {"bot_guid": "2", "name": "Companion", "role": "dps", "mood": "steady",
+                     "energy": 50, "voice": "dry and loyal"}
+        self.server.worlds.companions = lambda: [companion]
+        self.server.worlds.social_context = lambda: {"relationships": []}
+        updates = []
+        self.server.worlds.apply_social_updates = lambda value: updates.extend(value)
+        self.server.worlds.claim_reaction = lambda *args, **kwargs: True
+        self.server.worlds.active_world = lambda: {"canon": {"premise": "Old debts matter."}}
+        calls = []
+        def generate(purpose, prompt):
+            calls.append((purpose, prompt))
+            if purpose == "social":
+                return json.dumps({"react": True, "importance": 4, "speaker_guid": "2",
+                                   "tone": "triumphant", "updates": [{"source_guid": "2", "mood": "proud"}]})
+            return "That one was for every miner he cheated."
+        self.server._route_generation = generate
+        self.server._social_event(event)
+        self.assertEqual([item[0] for item in calls], ["social", "dialogue"])
+        self.assertEqual(updates[0]["mood"], "proud")
+        reply = self.server.store.pending("test", 5)[0]
+        self.assertEqual(reply["source_event_id"], event["event_id"])
+        self.assertEqual(reply["channel"], "party")
+        self.assertNotIn("Companion:", reply["text"])
+
+    def test_relationship_banter_is_one_bounded_followup(self) -> None:
+        event = {
+            "event_id": str(uuid4()), "realm_id": "test", "event_type": "chat.party",
+            "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+            "participants": [{"guid": "2", "kind": "soul", "name": "First"}],
+            "channel": "party", "text": "That was close.", "context": {},
+            "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+        }
+        companions = [
+            {"bot_guid": "2", "name": "First", "mood": "steady", "energy": 50,
+             "voice": "plain", "concern": ""},
+            {"bot_guid": "3", "name": "Second", "mood": "amused", "energy": 60,
+             "voice": "wry", "concern": "keeping First alive"},
+        ]
+        self.server.worlds.companions = lambda: companions
+        self.server.worlds.social_context = lambda: {"relationships": [{"rivalry": 20}]}
+        self.server.worlds.apply_social_updates = lambda _: None
+        self.server.worlds.claim_reaction = lambda *args, **kwargs: True
+        calls = []
+        def generate(purpose, prompt):
+            calls.append(purpose)
+            return (json.dumps({"speak": True, "speaker_guid": "3", "updates": []})
+                    if purpose == "social" else "Close? I had it completely under control.")
+        self.server._route_generation = generate
+        self.server._banter_followup(event, "You pulled before I was ready.")
+        self.assertEqual(calls, ["social", "dialogue"])
+        pending = self.server.store.pending("test", 5)
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]["source_event_id"], f"{event['event_id']}:banter")
+
     def test_replies_return_to_the_human_initiated_chat_channel(self) -> None:
         store = self.server.store
         for channel in ("say", "whisper", "party", "raid", "guild", "channel"):

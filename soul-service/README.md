@@ -61,6 +61,19 @@ guard removes speaker labels, wrapping quotation marks, and leading emotes, and
 suppresses narration or third-person stage directions rather than displaying
 them in game.
 
+The `social` route defaults to local `qwen3:1.7b` with a 160-token ceiling. It
+triages meaningful gameplay events and proposes clamped mood and relationship
+deltas. Only accepted moments reach the deeper `dialogue` route. Shared party
+conversation permits at most one cooldown-protected companion follow-up for an
+originating human event, so generated dialogue cannot create a reply chain.
+
+Session continuity stores at most 80 compact non-chat gameplay summaries while
+a human is online. When the session closes, the director produces one recap, at
+most three durable memories, six unresolved threads, and four callback
+candidates. Temporary summaries are deleted after successful reflection;
+callbacks expire after two uses and only 24 are retained. Authenticated
+`GET /admin/v1/world/social` exposes this bounded state without raw transcripts.
+
 Run its tests from the repository root with `./scripts/verify.sh` or directly:
 
 ```bash

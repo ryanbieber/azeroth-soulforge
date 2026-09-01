@@ -103,6 +103,47 @@ class WorldRepository:
               latency_ms INTEGER NOT NULL DEFAULT 0, success INTEGER NOT NULL,
               error_code TEXT, created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS companion_social_state (
+              world_id TEXT NOT NULL, bot_guid TEXT NOT NULL,
+              mood TEXT NOT NULL DEFAULT 'steady', energy INTEGER NOT NULL DEFAULT 50,
+              concern TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+              PRIMARY KEY(world_id,bot_guid), FOREIGN KEY(world_id) REFERENCES worlds(id)
+            );
+            CREATE TABLE IF NOT EXISTS companion_relationships (
+              world_id TEXT NOT NULL, source_guid TEXT NOT NULL, target_guid TEXT NOT NULL,
+              trust INTEGER NOT NULL DEFAULT 50, respect INTEGER NOT NULL DEFAULT 50,
+              irritation INTEGER NOT NULL DEFAULT 0, rivalry INTEGER NOT NULL DEFAULT 0,
+              summary TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+              PRIMARY KEY(world_id,source_guid,target_guid),
+              FOREIGN KEY(world_id) REFERENCES worlds(id)
+            );
+            CREATE TABLE IF NOT EXISTS social_reactions (
+              event_id TEXT PRIMARY KEY, world_id TEXT NOT NULL, speaker_guid TEXT,
+              importance INTEGER NOT NULL, reaction_kind TEXT NOT NULL, created_at TEXT NOT NULL,
+              FOREIGN KEY(world_id) REFERENCES worlds(id)
+            );
+            CREATE INDEX IF NOT EXISTS social_reactions_cooldown_idx
+              ON social_reactions(world_id,speaker_guid,created_at DESC);
+            CREATE TABLE IF NOT EXISTS session_event_candidates (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL,
+              world_id TEXT NOT NULL, event_id TEXT NOT NULL UNIQUE, event_type TEXT NOT NULL,
+              summary TEXT NOT NULL, context_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL,
+              FOREIGN KEY(session_id) REFERENCES world_sessions(id),
+              FOREIGN KEY(world_id) REFERENCES worlds(id)
+            );
+            CREATE TABLE IF NOT EXISTS session_reflections (
+              session_id TEXT PRIMARY KEY, world_id TEXT NOT NULL, summary TEXT NOT NULL,
+              unresolved_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL,
+              FOREIGN KEY(session_id) REFERENCES world_sessions(id),
+              FOREIGN KEY(world_id) REFERENCES worlds(id)
+            );
+            CREATE TABLE IF NOT EXISTS companion_callbacks (
+              id TEXT PRIMARY KEY, world_id TEXT NOT NULL, bot_guid TEXT NOT NULL,
+              topic TEXT NOT NULL, text TEXT NOT NULL, zone_name TEXT NOT NULL DEFAULT '',
+              reuse_count INTEGER NOT NULL DEFAULT 0, max_reuse INTEGER NOT NULL DEFAULT 2,
+              created_at TEXT NOT NULL, last_used_at TEXT,
+              FOREIGN KEY(world_id) REFERENCES worlds(id)
+            );
             """
         )
         now = utc_now()
@@ -116,6 +157,7 @@ class WorldRepository:
             ("director", chat_model, 0.7, 1200),
             ("dialogue", chat_model, 0.75, 180),
             ("ambient", ambient_model, 0.9, 96),
+            ("social", ambient_model, 0.2, 160),
         ):
             connection.execute(
                 """INSERT OR IGNORE INTO ai_routes
@@ -353,10 +395,14 @@ class WorldRepository:
             return []
         connection = self.store.connect()
         rows = connection.execute(
-            """SELECT b.role,b.party_position,s.*,COUNT(m.id) AS memory_count
+            """SELECT b.role,b.party_position,s.*,COUNT(m.id) AS memory_count,
+                      COALESCE(ss.mood,'steady') AS mood,COALESCE(ss.energy,50) AS energy,
+                      COALESCE(ss.concern,'') AS concern
                FROM companion_bindings b JOIN souls s
                  ON s.realm_id=b.realm_id AND s.bot_guid=b.bot_guid
                LEFT JOIN memories m ON m.realm_id=s.realm_id AND m.bot_guid=s.bot_guid
+               LEFT JOIN companion_social_state ss
+                 ON ss.world_id=b.world_id AND ss.bot_guid=b.bot_guid
                WHERE b.world_id=? GROUP BY b.world_id,b.bot_guid ORDER BY b.party_position""",
             (world["id"],),
         ).fetchall()
@@ -386,10 +432,10 @@ class WorldRepository:
         self.store.seed_soul(REALM_ID, guid, name)
         return next(item for item in self.companions() if item["bot_guid"] == guid)
 
-    def record_presence(self, humans_online: int, elapsed_seconds: int = 0) -> None:
+    def record_presence(self, humans_online: int, elapsed_seconds: int = 0) -> dict[str, str] | None:
         world = self.active_world()
         if not world:
-            return
+            return None
         elapsed = min(max(int(elapsed_seconds), 0), 120) if humans_online > 0 else 0
         connection = self.store.connect()
         session = connection.execute(
@@ -397,6 +443,7 @@ class WorldRepository:
             (world["id"],),
         ).fetchone()
         now = utc_now()
+        transition: dict[str, str] | None = None
         if humans_online > 0:
             if not session:
                 session_id = str(uuid4())
@@ -404,6 +451,7 @@ class WorldRepository:
                     "INSERT INTO world_sessions(id,world_id,started_at) VALUES(?,?,?)",
                     (session_id, world["id"], now),
                 )
+                transition = {"started": session_id}
             else:
                 session_id = session["id"]
             if elapsed:
@@ -418,8 +466,197 @@ class WorldRepository:
         elif session:
             connection.execute("UPDATE world_sessions SET ended_at=? WHERE id=?", (now, session["id"]))
             connection.execute("UPDATE worlds SET status='paused',updated_at=? WHERE id=?", (now, world["id"]))
+            transition = {"ended": str(session["id"])}
         connection.commit()
         self.store.close(connection)
+        return transition
+
+    def record_session_event(self, event: dict[str, Any]) -> None:
+        """Keep a bounded set of meaningful event summaries, never a chat transcript."""
+        if str(event.get("event_type", "")).startswith("chat."):
+            return
+        world = self.active_world()
+        if not world:
+            return
+        context = event.get("context") if isinstance(event.get("context"), dict) else {}
+        connection = self.store.connect()
+        session = connection.execute(
+            "SELECT id FROM world_sessions WHERE world_id=? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1",
+            (world["id"],),
+        ).fetchone()
+        if session:
+            actor = str(event.get("actor", {}).get("name", "The player"))[:24]
+            detail = str(event.get("text") or context.get("summary") or event["event_type"])[:300]
+            connection.execute(
+                """INSERT OR IGNORE INTO session_event_candidates
+                   (session_id,world_id,event_id,event_type,summary,context_json,created_at)
+                   VALUES(?,?,?,?,?,?,?)""",
+                (session["id"], world["id"], event["event_id"], event["event_type"],
+                 f"{actor}: {detail}", json.dumps(context, separators=(",", ":"))[:2000], utc_now()),
+            )
+            connection.execute(
+                """DELETE FROM session_event_candidates WHERE id IN (
+                     SELECT id FROM session_event_candidates WHERE session_id=?
+                     ORDER BY id DESC LIMIT -1 OFFSET 80)""", (session["id"],),
+            )
+            connection.commit()
+        self.store.close(connection)
+
+    def session_candidates(self, session_id: str) -> list[dict[str, Any]]:
+        connection = self.store.connect()
+        rows = connection.execute(
+            "SELECT id,event_type,summary,context_json,created_at FROM session_event_candidates WHERE session_id=? ORDER BY id",
+            (session_id,),
+        ).fetchall()
+        self.store.close(connection)
+        return [{**dict(row), "context": json.loads(row["context_json"] or "{}")} for row in rows]
+
+    def social_context(self) -> dict[str, Any]:
+        world = self.active_world()
+        if not world:
+            return {"states": [], "relationships": [], "reflection": None, "callbacks": []}
+        connection = self.store.connect()
+        states = connection.execute(
+            "SELECT * FROM companion_social_state WHERE world_id=? ORDER BY bot_guid", (world["id"],)
+        ).fetchall()
+        relationships = connection.execute(
+            "SELECT * FROM companion_relationships WHERE world_id=? ORDER BY source_guid,target_guid",
+            (world["id"],),
+        ).fetchall()
+        reflection = connection.execute(
+            "SELECT * FROM session_reflections WHERE world_id=? ORDER BY created_at DESC LIMIT 1",
+            (world["id"],),
+        ).fetchone()
+        callbacks = connection.execute(
+            "SELECT * FROM companion_callbacks WHERE world_id=? AND reuse_count<max_reuse ORDER BY created_at DESC LIMIT 12",
+            (world["id"],),
+        ).fetchall()
+        self.store.close(connection)
+        result = {
+            "states": [dict(row) for row in states],
+            "relationships": [dict(row) for row in relationships],
+            "reflection": dict(reflection) if reflection else None,
+            "callbacks": [dict(row) for row in callbacks],
+        }
+        if result["reflection"]:
+            result["reflection"]["unresolved"] = json.loads(result["reflection"].pop("unresolved_json") or "[]")
+        return result
+
+    def apply_social_updates(self, updates: list[dict[str, Any]]) -> None:
+        world = self.active_world()
+        if not world:
+            return
+        valid = {str(item["bot_guid"]) for item in self.companions()}
+        now, connection = utc_now(), self.store.connect()
+        for item in updates[:12]:
+            source, target = str(item.get("source_guid", "")), str(item.get("target_guid", ""))
+            if source not in valid:
+                continue
+            mood = re.sub(r"[^a-z_-]", "", str(item.get("mood", "steady")).lower())[:24] or "steady"
+            energy = max(0, min(int(item.get("energy", 50)), 100))
+            connection.execute(
+                """INSERT INTO companion_social_state(world_id,bot_guid,mood,energy,concern,updated_at)
+                   VALUES(?,?,?,?,?,?) ON CONFLICT(world_id,bot_guid) DO UPDATE SET
+                   mood=excluded.mood,energy=excluded.energy,concern=excluded.concern,updated_at=excluded.updated_at""",
+                (world["id"], source, mood, energy, str(item.get("concern", ""))[:180], now),
+            )
+            if target in valid and target != source:
+                prior = connection.execute(
+                    "SELECT * FROM companion_relationships WHERE world_id=? AND source_guid=? AND target_guid=?",
+                    (world["id"], source, target),
+                ).fetchone()
+                base = dict(prior) if prior else {"trust": 50, "respect": 50, "irritation": 0, "rivalry": 0}
+                values = [max(0, min(int(base[key]) + max(-5, min(int(item.get(f"{key}_delta", 0)), 5)), 100))
+                          for key in ("trust", "respect", "irritation", "rivalry")]
+                connection.execute(
+                    """INSERT INTO companion_relationships
+                       (world_id,source_guid,target_guid,trust,respect,irritation,rivalry,summary,updated_at)
+                       VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(world_id,source_guid,target_guid) DO UPDATE SET
+                       trust=excluded.trust,respect=excluded.respect,irritation=excluded.irritation,
+                       rivalry=excluded.rivalry,summary=excluded.summary,updated_at=excluded.updated_at""",
+                    (world["id"], source, target, *values, str(item.get("summary", ""))[:240], now),
+                )
+        connection.commit()
+        self.store.close(connection)
+
+    def claim_reaction(self, event_id: str, speaker_guid: str, importance: int,
+                       reaction_kind: str, cooldown_seconds: int = 45) -> bool:
+        world = self.active_world()
+        if not world:
+            return False
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=cooldown_seconds)).replace(
+            microsecond=0).isoformat().replace("+00:00", "Z")
+        connection = self.store.connect()
+        recent = connection.execute(
+            "SELECT 1 FROM social_reactions WHERE world_id=? AND speaker_guid=? AND created_at>=? LIMIT 1",
+            (world["id"], speaker_guid, cutoff),
+        ).fetchone()
+        if recent:
+            self.store.close(connection)
+            return False
+        cursor = connection.execute(
+            "INSERT OR IGNORE INTO social_reactions(event_id,world_id,speaker_guid,importance,reaction_kind,created_at) VALUES(?,?,?,?,?,?)",
+            (event_id, world["id"], speaker_guid, max(0, min(importance, 5)), reaction_kind[:32], utc_now()),
+        )
+        connection.commit()
+        self.store.close(connection)
+        return bool(cursor.rowcount)
+
+    def finish_session_reflection(self, session_id: str, result: dict[str, Any]) -> None:
+        world = self.active_world()
+        if not world:
+            return
+        summary = str(result.get("summary", "")).strip()[:2000]
+        if not summary:
+            return
+        valid = {str(item["bot_guid"]) for item in self.companions()}
+        now, connection = utc_now(), self.store.connect()
+        connection.execute(
+            "INSERT OR REPLACE INTO session_reflections(session_id,world_id,summary,unresolved_json,created_at) VALUES(?,?,?,?,?)",
+            (session_id, world["id"], summary, json.dumps(result.get("unresolved", [])[:6]), now),
+        )
+        for memory in result.get("memories", [])[:3]:
+            text = str(memory.get("text", "")).strip() if isinstance(memory, dict) else ""
+            if text:
+                connection.execute(
+                    "INSERT INTO world_memories(world_id,kind,text,importance,created_at) VALUES(?,'session_reflection',?,?,?)",
+                    (world["id"], text[:1200], max(1, min(int(memory.get("importance", 3)), 5)), now),
+                )
+        for callback in result.get("callbacks", [])[:4]:
+            guid = str(callback.get("bot_guid", "")) if isinstance(callback, dict) else ""
+            text = str(callback.get("text", "")).strip() if isinstance(callback, dict) else ""
+            if guid in valid and text:
+                connection.execute(
+                    """INSERT INTO companion_callbacks
+                       (id,world_id,bot_guid,topic,text,zone_name,created_at) VALUES(?,?,?,?,?,?,?)""",
+                    (str(uuid4()), world["id"], guid, str(callback.get("topic", "unfinished business"))[:120],
+                     text[:500], str(callback.get("zone_name", ""))[:80], now),
+                )
+        connection.execute("DELETE FROM session_event_candidates WHERE session_id=?", (session_id,))
+        connection.execute(
+            """DELETE FROM companion_callbacks WHERE id IN (SELECT id FROM companion_callbacks
+               WHERE world_id=? ORDER BY created_at DESC LIMIT -1 OFFSET 24)""", (world["id"],),
+        )
+        connection.commit()
+        self.store.close(connection)
+
+    def claim_callback(self) -> dict[str, Any] | None:
+        world = self.active_world()
+        if not world:
+            return None
+        connection = self.store.connect()
+        row = connection.execute(
+            "SELECT * FROM companion_callbacks WHERE world_id=? AND reuse_count<max_reuse ORDER BY last_used_at IS NOT NULL,created_at DESC LIMIT 1",
+            (world["id"],),
+        ).fetchone()
+        if row:
+            connection.execute(
+                "UPDATE companion_callbacks SET reuse_count=reuse_count+1,last_used_at=? WHERE id=?",
+                (utc_now(), row["id"]),
+            )
+            connection.commit()
+        self.store.close(connection)
+        return dict(row) if row else None
 
     def providers(self) -> list[dict[str, Any]]:
         connection = self.store.connect()
@@ -495,7 +732,7 @@ class WorldRepository:
 
     def save_routes(self, payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
         connection = self.store.connect()
-        for purpose in ("director", "dialogue", "ambient"):
+        for purpose in ("director", "dialogue", "ambient", "social"):
             if purpose not in payload:
                 continue
             route = payload[purpose]

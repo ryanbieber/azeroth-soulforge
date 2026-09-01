@@ -366,6 +366,12 @@ class SoulStore:
         connection.commit()
         self.close(connection)
 
+    def mark_complete(self, event_id: str) -> None:
+        connection = self.connect()
+        connection.execute("UPDATE events SET status='complete' WHERE event_id=?", (event_id,))
+        connection.commit()
+        self.close(connection)
+
     def enqueue_proactive(self, source_id: str, realm: str, bot_guid: str,
                           recipient_guid: str, text: str, channel: str = "whisper",
                           channel_name: str = "") -> None:
@@ -751,6 +757,12 @@ class SoulforgeServer(ThreadingHTTPServer):
                     self._director_event(job)
                 elif job.get("kind") == "memory_compaction":
                     self._compact_world_memory(job["world_id"])
+                elif job.get("kind") == "social_event":
+                    self._social_event(job["event"])
+                elif job.get("kind") == "session_reflection":
+                    self._reflect_session(job["session_id"])
+                elif job.get("kind") == "return_callback":
+                    self._return_callback(job["player"])
                 else:
                     self._dialogue(job["event"])
             except Exception as error:  # Stay silent in game when inference is unavailable.
@@ -890,28 +902,36 @@ class SoulforgeServer(ThreadingHTTPServer):
         if len(companions) < 2:
             return
         first_guid = str(event["participants"][0]["guid"])
-        first_index = next(
-            (index for index, item in enumerate(companions) if str(item["bot_guid"]) == first_guid),
-            0,
+        local_prompt = (
+            "Act as a cheap social-state classifier. Decide whether one additional companion should "
+            "naturally answer this party exchange. Return strict JSON only: "
+            '{"speak":true,"speaker_guid":"123","updates":[{"source_guid":"123",'
+            '"target_guid":"456","mood":"amused","energy":55,"trust_delta":0,'
+            '"respect_delta":1,"irritation_delta":0,"rivalry_delta":1,"summary":"brief"}]}. '
+            "Use at most two updates, each delta -2..2. Prefer silence; never select the first speaker.\n"
+            f"Companions: {json.dumps([{k: item[k] for k in ('bot_guid','name','mood','energy')} for item in companions])}\n"
+            f"Player message: {event.get('text','')[:400]}\nFirst companion: {first_reply[:400]}"
         )
-        responder = companions[(first_index + 1) % len(companions)]
-        first_name = str(event["participants"][0]["name"])
-        synthetic = {
-            "realm_id": event["realm_id"],
-            "participants": [{"guid": str(responder["bot_guid"]), "name": responder["name"]}],
-            "actor": {"guid": first_guid, "kind": "soul", "name": first_name},
-            "channel": event.get("channel", "party"),
-            "context": event.get("context", {}),
-            "text": first_reply,
-        }
-        prompt_data = self.store.build_prompt(synthetic)
-        if prompt_data is None:
+        decision = self._json_object(self._route_generation("social", local_prompt), require_premise=False)
+        updates = decision.get("updates", [])
+        if isinstance(updates, list):
+            self.worlds.apply_social_updates([item for item in updates if isinstance(item, dict)])
+        if decision.get("speak") is not True:
             return
-        prompt = prompt_data[2] + (
-            "\nReply as a witty in-character party interjection to the other companion. "
-            "Keep it to one or two short sentences and add personality rather than exposition. "
-            "Output only the literal first-person words this companion types into party chat—no name label, "
-            "narration, stage directions, emotes, action descriptions, or gameplay commands."
+        responder = next((item for item in companions
+                          if str(item["bot_guid"]) == str(decision.get("speaker_guid"))
+                          and str(item["bot_guid"]) != first_guid), None)
+        if not responder or not self.worlds.claim_reaction(
+                f"{event['event_id']}:banter", str(responder["bot_guid"]), 1, "banter", 90):
+            return
+        social = self.worlds.social_context()
+        prompt = (
+            "Write one natural follow-up line in a relationship-driven World of Warcraft party scene. "
+            f"You are {responder['name']}; output only the literal words they type, at most 35 words. "
+            "No label, narration, emote, stage direction, AI mention, or gameplay command. Do not merely agree.\n"
+            f"Voice: {responder['voice']}. Mood: {responder['mood']}. Concern: {responder['concern']}.\n"
+            f"Relationships: {json.dumps(social['relationships'][:12], ensure_ascii=False)}\n"
+            f"Player: {event.get('text','')[:400]}\n{event['participants'][0]['name']}: {first_reply[:400]}"
         )
         reply = normalize_chat_reply(
             self._route_generation("dialogue", prompt), str(responder["name"])
@@ -921,6 +941,104 @@ class SoulforgeServer(ThreadingHTTPServer):
                 f"{event['event_id']}:banter", event["realm_id"], str(responder["bot_guid"]),
                 str(event["actor"]["guid"]), reply, str(event.get("channel", "party")),
                 str(event.get("context", {}).get("channel_name", "")),
+            )
+
+    def _social_event(self, event: dict[str, Any]) -> None:
+        companions = self.worlds.companions()
+        participant_guids = {str(item.get("guid")) for item in event.get("participants", [])}
+        eligible = [item for item in companions if str(item["bot_guid"]) in participant_guids]
+        if not eligible:
+            self.store.dismiss(event["event_id"])
+            return
+        social = self.worlds.social_context()
+        triage_prompt = (
+            "Classify a gameplay event for a small companion party. Return strict JSON only as "
+            '{"react":true,"importance":3,"speaker_guid":"123","tone":"relieved",'
+            '"updates":[{"source_guid":"123","target_guid":"456","mood":"relieved",'
+            '"energy":45,"trust_delta":1,"respect_delta":0,"irritation_delta":-1,'
+            '"rivalry_delta":0,"summary":"brief"}]}. Importance is 0..5; react only for a '
+            "moment a real party member would comment on. Use at most three updates, each delta -2..2. "
+            "The AI is social only and must never suggest or execute gameplay control.\n"
+            f"Event: {json.dumps(event, ensure_ascii=False)[:4000]}\n"
+            f"Eligible companions: {json.dumps([{k: item[k] for k in ('bot_guid','name','role','mood','energy')} for item in eligible])}\n"
+            f"Current relationships: {json.dumps(social['relationships'][:16])}"
+        )
+        decision = self._json_object(self._route_generation("social", triage_prompt), require_premise=False)
+        updates = decision.get("updates", [])
+        if isinstance(updates, list):
+            self.worlds.apply_social_updates([item for item in updates if isinstance(item, dict)])
+        speaker = next((item for item in eligible
+                        if str(item["bot_guid"]) == str(decision.get("speaker_guid"))), eligible[0])
+        importance = max(0, min(int(decision.get("importance", 0)), 5))
+        if decision.get("react") is not True or importance < 2 or not self.worlds.claim_reaction(
+                event["event_id"], str(speaker["bot_guid"]), importance, event["event_type"]):
+            self.store.dismiss(event["event_id"])
+            return
+        world = self.worlds.active_world() or {}
+        prompt = (
+            f"You are {speaker['name']}, a persistent World of Warcraft companion. React naturally to "
+            "this gameplay moment in one short chat line, normally under 35 words. Output only the literal "
+            "first-person words typed in chat: no label, narration, emote, stage direction, AI mention, or "
+            "gameplay command. Do not summarize data mechanically.\n"
+            f"Voice: {speaker['voice']}. Mood: {speaker['mood']}. Event tone: {decision.get('tone','natural')}.\n"
+            f"World canon: {json.dumps(world.get('canon', {}), ensure_ascii=False)[:3000]}\n"
+            f"Gameplay event: {json.dumps(event, ensure_ascii=False)[:4000]}"
+        )
+        reply = normalize_chat_reply(self._route_generation("dialogue", prompt), str(speaker["name"]))
+        if reply and self.ai_enabled:
+            self.store.enqueue_proactive(
+                event["event_id"], event["realm_id"], str(speaker["bot_guid"]),
+                str(event["actor"]["guid"]), reply, str(event.get("channel", "party")),
+                str(event.get("context", {}).get("channel_name", "")),
+            )
+            self.store.mark_complete(event["event_id"])
+        else:
+            self.store.dismiss(event["event_id"])
+
+    def _reflect_session(self, session_id: str) -> None:
+        candidates = self.worlds.session_candidates(session_id)
+        if not candidates:
+            return
+        world, companions = self.worlds.active_world(), self.worlds.companions()
+        if not world or not companions:
+            return
+        prompt = (
+            "Reflect on one finished private WoW play session. Return strict JSON only with keys summary "
+            "(2-4 concise sentences), memories (at most 3 objects with text and importance 1..5), "
+            "unresolved (at most 6 short strings), relationship_updates (at most 4 bounded social update "
+            "objects), and callbacks (at most 4 objects with bot_guid, topic, text, zone_name). Keep only "
+            "meaningful achievements, setbacks, promises, relationship turns, "
+            "and unfinished threads. Never invent rewards or store raw chat. Callback text is a compact fact "
+            "for a future greeting, not finished dialogue.\n"
+            f"Canon: {json.dumps(world['canon'], ensure_ascii=False)[:5000]}\n"
+            f"Companions: {json.dumps([{k: item[k] for k in ('bot_guid','name','role','mood')} for item in companions])}\n"
+            f"Bounded event summaries: {json.dumps(candidates, ensure_ascii=False)[:12000]}"
+        )
+        result = self._json_object(self._route_generation("director", prompt), require_premise=False)
+        updates = result.get("relationship_updates", [])
+        if isinstance(updates, list):
+            self.worlds.apply_social_updates([item for item in updates if isinstance(item, dict)])
+        self.worlds.finish_session_reflection(session_id, result)
+
+    def _return_callback(self, player: dict[str, Any]) -> None:
+        callback = self.worlds.claim_callback()
+        if not callback:
+            return
+        companion = next((item for item in self.worlds.companions()
+                          if str(item["bot_guid"]) == str(callback["bot_guid"])), None)
+        if not companion:
+            return
+        prompt = (
+            f"You are {companion['name']}, greeting {player.get('name','your friend')} when they return to "
+            "a private WoW world. Make one subtle callback to the prior session in at most 30 words. "
+            "Output only literal chat words; no label, narration, emote, stage direction, AI mention, or command.\n"
+            f"Voice: {companion['voice']}. Prior thread: {callback['text']}"
+        )
+        reply = normalize_chat_reply(self._route_generation("dialogue", prompt), str(companion["name"]))
+        if reply and self.ai_enabled:
+            self.store.enqueue_proactive(
+                f"return:{callback['id']}:{callback['reuse_count']}", self.worlds.active_world()["realm_id"],
+                str(companion["bot_guid"]), str(player["guid"]), reply, "whisper",
             )
 
     def _compact_world_memory(self, world_id: str) -> None:
@@ -1013,7 +1131,12 @@ class SoulforgeServer(ThreadingHTTPServer):
                 payload = self.control("GET", "/v1/presence")
                 count = max(int(payload.get("humans_online", 0)), 0)
                 elapsed = int(now - self._last_presence_tick) if count > 0 and self.humans_online > 0 else 0
-                self.worlds.record_presence(count, elapsed)
+                transition = self.worlds.record_presence(count, elapsed)
+                players = payload.get("players") or []
+                if transition and transition.get("ended") and self.ai_enabled:
+                    self.jobs.put_nowait({"kind": "session_reflection", "session_id": transition["ended"]})
+                elif transition and transition.get("started") and players and self.ai_enabled:
+                    self.jobs.put_nowait({"kind": "return_callback", "player": players[0]})
                 if count > 0:
                     self._empty_since = None
                     self._auto_stop_fired = False
@@ -1024,7 +1147,6 @@ class SoulforgeServer(ThreadingHTTPServer):
                 if count > 0 and self.ai_enabled:
                     plan = self.worlds.claim_due_plan()
                     companions = self.worlds.companions()
-                    players = payload.get("players") or []
                     if plan and companions and players:
                         self.jobs.put_nowait({
                             "kind": "director_event", "plan": plan,
@@ -1131,6 +1253,9 @@ class SoulHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/admin/v1/world/rumors":
             if self._admin_session():
                 self._json(HTTPStatus.OK, {"rumors": self.server.worlds.rumors()})
+        elif parsed.path == "/admin/v1/world/social":
+            if self._admin_session():
+                self._json(HTTPStatus.OK, self.server.worlds.social_context())
         elif parsed.path == "/admin/v1/world/companions":
             if self._admin_session():
                 self._json(HTTPStatus.OK, {"companions": self.server.worlds.companions()})
@@ -1242,7 +1367,11 @@ class SoulHandler(BaseHTTPRequestHandler):
                 return
             status = self.server.store.accept(event, body.decode())
             if status == "accepted":
-                self.server.jobs.put_nowait({"kind": "dialogue", "event": event})
+                if str(event["event_type"]).startswith("chat."):
+                    self.server.jobs.put_nowait({"kind": "dialogue", "event": event})
+                else:
+                    self.server.worlds.record_session_event(event)
+                    self.server.jobs.put_nowait({"kind": "social_event", "event": event})
             self._json(HTTPStatus.ACCEPTED, {"event_id": event["event_id"], "status": status})
         elif self.path.startswith("/v1/outbox/") and self.path.endswith("/ack"):
             if not self._authorized(body):
@@ -1818,15 +1947,24 @@ class SoulHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _validate_event(event: dict[str, Any]) -> None:
-        for key in ("event_id", "realm_id", "event_type", "actor", "participants", "channel", "text", "trace"):
+        for key in ("event_id", "realm_id", "event_type", "actor", "participants", "trace"):
             if key not in event:
                 raise ValueError(f"missing {key}")
         if not event["participants"]:
-            raise ValueError("one chat participant is required")
+            raise ValueError("one participant is required")
+        event_type = str(event["event_type"])
+        is_chat = event_type.startswith("chat.")
         participant_kind = event["participants"][0].get("kind")
         tier = event.get("context", {}).get("dialogue_tier") if isinstance(event.get("context", {}), dict) else None
-        if participant_kind != "soul" and not (participant_kind == "playerbot" and tier == "ambient"):
+        if is_chat and participant_kind != "soul" and not (participant_kind == "playerbot" and tier == "ambient"):
             raise ValueError("first participant must be a soul or ambient playerbot")
+        allowed_events = {
+            "group.join", "group.leave", "guild.join", "guild.leave", "quest.complete",
+            "character.death", "character.resurrect", "character.level", "trade.complete",
+            "loot.notable", "dungeon.complete", "boss.kill", "progression.unlock",
+        }
+        if not is_chat and event_type not in allowed_events:
+            raise ValueError("unsupported event type")
         if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", str(event["realm_id"])):
             raise ValueError("invalid realm identity")
         for character in [event["actor"], *event["participants"]]:
@@ -1836,18 +1974,21 @@ class SoulHandler(BaseHTTPRequestHandler):
                 raise ValueError("invalid character name")
         if event["trace"].get("origin") != "human" or event["trace"].get("hop_count") != 0:
             raise ValueError("generated-event loops are forbidden")
-        channel = str(event["channel"])
-        if channel not in {"say", "whisper", "party", "raid", "guild", "channel"}:
+        channel = str(event.get("channel", "system"))
+        if channel not in {"say", "whisper", "party", "raid", "guild", "channel", "system"}:
             raise ValueError("invalid chat channel")
-        if event["event_type"] != f"chat.{channel}":
+        if is_chat and event_type != f"chat.{channel}":
             raise ValueError("event type does not match chat channel")
         context = event.get("context", {})
         if not isinstance(context, dict):
             raise ValueError("invalid event context")
         channel_name = str(context.get("channel_name", ""))
-        if channel == "channel" and not 1 <= len(channel_name) <= 128:
+        if is_chat and channel == "channel" and not 1 <= len(channel_name) <= 128:
             raise ValueError("public channel name is required")
-        if not 0 < len(event["text"]) <= 4096:
+        text = str(event.get("text", ""))
+        if is_chat and not 0 < len(text) <= 4096:
+            raise ValueError("invalid text length")
+        if len(text) > 4096:
             raise ValueError("invalid text length")
 
     def _json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:

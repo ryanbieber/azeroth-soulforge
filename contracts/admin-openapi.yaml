@@ -44,6 +44,10 @@ paths:
     get:
       summary: Return spoiler-free hints for planned narrative events
       responses: {"200": {description: Rumors and tensions}}
+  /world/social:
+    get:
+      summary: Return bounded companion moods, relationships, latest session reflection, and callback threads
+      responses: {"200": {description: Social continuity state for the active world}}
   /world/companions:
     get:
       summary: Return deep-memory companions bound to the active world
@@ -87,10 +91,10 @@ paths:
       responses: {"200": {description: Provider connected}, "400": {description: Test failed}}
   /ai/routing:
     get:
-      summary: Return separate director, companion-dialogue, and ambient-bot model routes
+      summary: Return separate director, companion-dialogue, ambient-bot, and local social-instinct model routes
       responses: {"200": {description: AI routes}}
     put:
-      summary: Replace director, companion-dialogue, and ambient-bot model routes
+      summary: Replace director, companion-dialogue, ambient-bot, and local social-instinct model routes
       responses: {"200": {description: AI routes saved}}
   /ai/state:
     get:

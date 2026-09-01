@@ -15,6 +15,13 @@ applies its probability and global cooldown before any inference. Generated bot
 messages are rejected by the capture hooks, so ambient chatter cannot create a
 bot-to-bot reply chain.
 
+The same bounded queue captures compact social gameplay signals for a human and
+their controlled Playerbots: player or companion death, resurrection, human
+level-up, quest completion, and dungeon/world-boss kills. Hooks only assemble
+and enqueue JSON; HTTP, inference, and SQLite remain off the world thread.
+Routine damage, movement, combat ticks, loot spam, and random-bot activity are
+not captured.
+
 Soulforge Commander can issue `.soulforge roster` as an ordinary player. The
 command only queues an internal signed roster request. Soulbridge resolves it on
 the worker thread and returns machine-readable system messages on the world

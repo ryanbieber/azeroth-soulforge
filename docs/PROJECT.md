@@ -128,11 +128,13 @@ is still initializing or caught in a restart loop.
 
 ## 4. Event and reply flow
 
-Capture chat involving a soul plus guild/group changes, quest completions,
-deaths, resurrections, trades, notable loot, dungeon completion, boss kills,
-and phase unlocks. Exclude routine combat, movement ticks, damage events, and
-ambient random-bot activity. Events use `contracts/events.schema.json` and are
-idempotent by `event_id`.
+Capture chat involving a soul plus guild/group changes and meaningful gameplay
+events. The current bridge emits human or controlled-companion deaths, human
+resurrection, level-up, quest completion, and dungeon/world-boss kills; the
+contract also reserves trades, notable loot, dungeon completion, and phase
+unlocks for additive producers. Exclude routine combat, movement ticks, damage
+events, and ambient random-bot activity. Events use
+`contracts/events.schema.json` and are idempotent by `event_id`.
 
 1. Soulbridge submits a compact event from its worker queue.
 2. The service validates, authenticates, deduplicates, and persists it.
@@ -147,10 +149,10 @@ Delivery is at-least-once until acknowledgement; consumers deduplicate by reply
 ID. Expired replies are not spoken. During outages, Playerbots continues and
 soul chat is temporarily silent.
 
-Generated responses carry a trace ID, origin, and hop count. A generated bot
-message may cause at most one further bot reply. Duplicate suppression,
-per-bot cooldowns, channel budgets, and a guild-wide budget prevent cascades.
-Human messages begin a new trace.
+Generated responses carry a trace ID, origin, and hop count. One human party
+message may cause at most one relationship-driven companion follow-up; generated
+chat is never captured as a new event. Duplicate suppression and per-speaker
+cooldowns prevent cascades. Human messages begin a new trace.
 
 ## 5. Soul and memory model
 
@@ -182,6 +184,16 @@ event payloads retain at most seven days or 2,000 completed events; expired
 outbox rows are collected. The distilled non-canonical ledger retains the 400
 highest-importance recent facts while founding and narrative events are
 protected.
+
+Meaningful gameplay events also feed an 80-item per-session summary buffer; chat
+transcripts never enter it. When aggregate human presence changes from nonzero
+to zero, the director may write one recap, at most three durable memories, six
+unresolved threads, and four callback candidates. Successful reflection deletes
+the temporary buffer. A world retains at most 24 callbacks, each usable twice.
+On the next session start, one eligible companion may turn a callback fact into
+a short greeting. Companion mood and directed trust, respect, irritation, and
+rivalry stay in 0–100 bounds; each event can move a relationship by at most five
+points in persistence even if a model proposes more.
 
 Retrieval combines SQLite FTS keyword ranking with cosine similarity over local
 embeddings, then filters by soul, participants, phase, recency, importance, and
@@ -238,7 +250,9 @@ The dashboard's Home page is the everyday control surface: prompted-world state,
 human presence, world playtime, Enter/Leave controls, service state, companion
 status, AI kill switch, active director/dialogue routes, normalized token usage,
 and estimated spend. World, Companions, AI Studio, Client Addons, and Advanced pages
-separate story continuity from infrequent administration. API credentials are
+separate story continuity from infrequent administration. World shows the most
+recent session recap and unresolved threads through the authenticated social
+endpoint. API credentials are
 encrypted at rest and never returned to the browser. Progression controls remain
 absent until backup verification and restore testing are automated.
 
@@ -282,7 +296,7 @@ only when existing consumers remain safe.
 | Upstream compatibility spike | Complete | Pinned Docker build passes |
 | Soulbridge transport | Alpha | Async HMAC event/outbox transport builds |
 | Soul Service core | Alpha | SQLite inbox/outbox and bridge APIs implemented |
-| Memory and relationships | Partial | Recent per-soul dialogue persists; richer model pending |
+| Memory and relationships | Alpha | Bounded chat, social state, session reflection, and callbacks pass tests |
 | Ollama dialogue | Alpha | `qwen3.5:4b` local chat adapter implemented |
 | Dashboard | Alpha | Authenticated HTTPS React control plane and safe admin workflows |
 | Prompted fresh world | Alpha | Immutable seed, canon, dungeon group and narrative plans persist |
@@ -920,3 +934,38 @@ Pages validation, the React production build, Compose validation, and the C++
 bridge test. The deployed dashboard bundle exposed the control, the authenticated
 settings API reported `2.5`, all 12 active `Rate.XP.*` keys were `2.5`, and auth
 and worldserver returned healthy with ports 3724 and 8085 reachable.
+
+### 2026-09-01 — Add bounded social continuity around gameplay sessions
+
+**Decision:** Add three coordinated social systems. First, Soulbridge emits
+compact death, resurrection, level, quest, and boss events for the human's
+controlled party; local `qwen3:1.7b` triages them and a deep dialogue route writes
+only selected reactions. Second, local classification updates bounded companion
+mood and directed relationship dimensions and may authorize one deep-model
+party follow-up. Third, logout queues one director reflection over at most 80
+non-chat event summaries and stores at most three memories plus a small callback
+set for future logins.
+
+**Reason:** Companions feel continuous when they notice shared victories and
+setbacks, develop restrained interpersonal texture, and remember unfinished
+business across play sessions. Running every event through the expensive model
+would add cost and noise, while storing entire chat logs would make context grow
+without bound.
+
+**Consequence:** The LLM remains a social layer and never controls Playerbots.
+Gameplay hooks only enqueue compact JSON on the world thread. Social deltas are
+clamped, reactions are deduplicated and cooldown-protected, generated dialogue
+cannot re-enter capture, temporary session summaries are deleted after a
+successful reflection, and callbacks expire after two uses. The authenticated
+World page can show the latest recap without exposing raw transcripts. The
+local social route is independent of the paid director/dialogue routes so cheap
+triage cannot silently consume Luna-level tokens.
+On 2026-09-01, the complete AzerothCore/Playerbots worldserver image compiled and
+linked all five new Soulbridge gameplay hooks. `./scripts/verify.sh` passed 31
+Soul Service tests, 13 control-agent tests, Pages validation, the React production
+build, Compose validation, Lua parsing, and the C++ queue build/test. The deployed
+SQLite database contained all six new social/session tables and a local
+`qwen3:1.7b` social route capped at 160 tokens. After controlled recreation,
+database, authserver, worldserver, Soul Service, gateway, control agent, and
+Ollama all reported healthy; worldserver reached ready state and logged the
+Soulbridge worker connection to Soul Service.

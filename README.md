@@ -95,9 +95,18 @@ honor, and profession rates; forge character
 profiles; edit each
 character’s `SKILL.md`; preview each companion's assembled chat prompt; inspect
 memories; and route Ollama, OpenAI, Anthropic, Gemini, or OpenAI-compatible
-models separately for world direction, companion dialogue, and ambient chatter.
+models separately for world direction, companion dialogue, ambient chatter, and
+cheap local social instincts.
 Ambient replies are zone-aware, probabilistic, globally rate-limited, and do not
 receive or create deep personal memories.
+Companions also react to meaningful deaths, resurrections, level-ups, quest
+completions, and boss kills. The local model decides whether a response is
+warranted and updates bounded mood/relationship state; the deeper model writes
+only the moments worth saying. Party banter permits one follow-up, never a reply
+chain. At logout, Soulforge reflects over at most 80 compact gameplay summaries
+rather than a chat transcript, retains at most three durable memories, and can
+make a short callback after the next login. The World page shows the latest
+recap under **Last time in Azeroth**.
 Playerbots remains responsible for every
 gameplay action—the language model is only a social layer.
 

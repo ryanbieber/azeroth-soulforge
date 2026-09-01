@@ -4,6 +4,9 @@ The dashboard is a Vite-built React single-page application for the prompted
 fresh-world experience. Home combines world lifecycle, human presence, server
 health, AI state, usage, and spend; focused World, Companions, AI Studio, Client Addons,
 and Advanced pages keep routine play separate from administration.
+World shows the latest bounded session reflection as **Last time in Azeroth**.
+That view uses authenticated social-state summaries and never receives raw
+event buffers, model credentials, or private chat transcripts.
 Advanced exposes bounded XP scaling from 0.1×–10× through the existing
 allowlisted server-settings API; applying it persists the grouped AzerothCore
 XP rates and restarts worldserver when it is running.

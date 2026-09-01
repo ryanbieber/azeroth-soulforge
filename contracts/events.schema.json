@@ -17,7 +17,7 @@
       "enum": [
         "chat.say", "chat.whisper", "chat.party", "chat.raid", "chat.guild", "chat.channel",
         "group.join", "group.leave", "guild.join", "guild.leave",
-        "quest.complete", "character.death", "character.resurrect",
+        "quest.complete", "character.death", "character.resurrect", "character.level",
         "trade.complete", "loot.notable", "dungeon.complete", "boss.kill",
         "progression.unlock"
       ]
