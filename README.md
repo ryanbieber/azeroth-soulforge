@@ -102,14 +102,18 @@ Playerbots remains responsible for every
 gameplay action—the language model is only a social layer.
 
 The dashboard provides one **Client Addons** pack containing pinned
-ConsolePortLK 1.5.0-rc2 and **Soulforge Commander**. Soulforge Commander is a
+ConsolePortLK 1.5.0-rc2, **Soulforge Commander**, and the legacy Windows
+WoWmapperX 1.1.0 controller utility. Soulforge Commander is a
 ConsolePort plugin: its managed ring contains Follow, Stay, Attack, Tank Pull,
 Flee, Reset, Rebuff, and Companions. The companion segment opens a
 controller-navigable roster where the active world's companions can be synced,
 enabled, targeted, and assembled. Names are never baked into the addon, so
-roster changes do not require another download. Extract every top-level folder
-directly into `Interface/AddOns` and verify both `ConsolePort/ConsolePort.toc`
-and `SoulforgeCommander/SoulforgeCommander.toc` exist there.
+roster changes do not require another download. Extract the pack outside
+`Interface/AddOns`, copy only the listed addon folders into `Interface/AddOns`,
+then start `Controller/WoWmapperX/WoWmapperX.exe` before Wow.exe. Commander
+automatically occupies ConsolePort's default utility-ring chord on the bar while
+leaving movement bindings untouched. WoWmapperX is archived/deprecated upstream
+and is never launched automatically.
 
 ## Important safety notes
 

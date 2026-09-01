@@ -42,13 +42,39 @@ def validate(path: str) -> None:
             required = {
                 "ConsolePort/ConsolePort.toc",
                 "ConsolePort/LICENSE.md",
+                "ConsolePort/Config/Lookup.lua",
+                "ConsolePort/Frames/Utility.lua",
+                "ConsolePort/Controllers/XBOX/Xbox.lua",
+                "ConsolePort/Controllers/PS4/PS4.lua",
                 "ConsolePortBar/ConsolePortBar.toc",
+                "ConsolePortBar/Core/Bar.lua",
                 "ConsolePortKeyboard/ConsolePortKeyboard.toc",
             }
             names = {item.filename for item in files}
             missing = required - names
             if missing:
                 raise ValueError(f"archive is missing required files: {sorted(missing)}")
+
+            utility = archive.read("ConsolePort/Frames/Utility.lua").decode("utf-8", errors="strict")
+            lookup = archive.read("ConsolePort/Config/Lookup.lua").decode("utf-8", errors="strict")
+            bar = archive.read("ConsolePortBar/Core/Bar.lua").decode("utf-8", errors="strict")
+            for marker in (
+                "function ConsolePort:SetupUtilityBindings()",
+                "function Utility:Refresh()",
+                "function Utility:GetBindingForSet(setID)",
+            ):
+                if marker not in utility:
+                    raise ValueError(f"ConsolePortLK utility API is incompatible: missing {marker}")
+            if "function ConsolePort:GetData" not in lookup:
+                raise ValueError("ConsolePortLK plugin data API is incompatible")
+            if "RegisterCallback('OnNewBindings', Bar.OnNewBindings" not in bar:
+                raise ValueError("ConsolePortBar does not refresh after utility binding changes")
+            for controller in ("XBOX", "PS4"):
+                source = archive.read(
+                    f"ConsolePort/Controllers/{controller}/{controller.title() if controller == 'XBOX' else controller}.lua"
+                ).decode("utf-8", errors="strict")
+                if "'CLICK ConsolePortUtilityToggle:LeftButton'" not in source:
+                    raise ValueError(f"{controller} profile lacks the default utility-ring chord")
     except BadZipFile as error:
         raise ValueError("archive is not a valid ZIP file") from error
 

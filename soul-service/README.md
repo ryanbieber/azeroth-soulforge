@@ -13,8 +13,8 @@ variables in the root `compose.yaml`. The versioned endpoints are documented in
 endpoints are described separately in `contracts/admin-openapi.yaml`.
 
 The authenticated addon endpoints report package metadata and produce one
-client ZIP from the checksum-verified ConsolePortLK archive plus the repository's
-Soulforge Commander source. The third-party archive is runtime data mounted
+client ZIP from checksum-verified ConsolePortLK and WoWmapperX archives plus the
+repository's Soulforge Commander source. The third-party archives are runtime data mounted
 read-only from `runtime/client-addons`; it is never committed or served by the
 public GitHub Pages site.
 

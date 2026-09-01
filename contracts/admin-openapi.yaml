@@ -105,18 +105,18 @@ paths:
       responses: {"200": {description: Monthly AI usage}}
   /addons:
     get:
-      summary: Return client-addon pack readiness, pinned versions, and included folders
+      summary: Return client-pack readiness, pinned addon and controller-mapper versions, and install paths
       responses:
         "200":
           description: Client-addon pack metadata; readiness describes the server package, not client installation
   /addon/download:
     get:
-      summary: Download the pinned ConsolePortLK and Soulforge Commander client pack
+      summary: Download pinned ConsolePortLK, Soulforge Commander, and legacy WoWmapperX controller files
       responses:
         "200":
           description: WoW 3.3.5a multi-addon ZIP
           content: {application/zip: {schema: {type: string, format: binary}}}
-        "503": {description: Pinned ConsolePortLK archive or Soulforge Commander source unavailable}
+        "503": {description: A pinned client component or Soulforge Commander source is unavailable}
   /session:
     get:
       summary: Inspect the current authenticated session

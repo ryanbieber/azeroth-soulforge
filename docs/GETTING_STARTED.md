@@ -188,26 +188,32 @@ the server and client are on the same LAN.
 ## 7. Command your companion party
 
 Open **Client Addons** in the authenticated dashboard and download the single
-pack. It contains pinned ConsolePortLK 1.5.0-rc2 and Soulforge Commander; it
+pack. It contains pinned ConsolePortLK 1.5.0-rc2, Soulforge Commander, and the
+legacy Windows WoWmapperX 1.1.0 controller utility; it
 contains no character names or credentials. Extract the ZIP first because WoW
-cannot load addon ZIP files. Copy every extracted top-level addon folder directly
-into `Interface/AddOns` and verify these exact paths exist with no extra parent:
+cannot load addon ZIP files. Extract it somewhere outside `Interface/AddOns`,
+then copy only the addon folders listed by the dashboard into
+`Interface/AddOns`. Verify these exact paths exist with no extra parent:
 
 ```text
 Interface/AddOns/ConsolePort/ConsolePort.toc
 Interface/AddOns/SoulforgeCommander/SoulforgeCommander.toc
 ```
 
-Fully close and restart Wow.exe, enable both addons at character selection, and
-complete ConsolePort's controller calibration. WoW 3.3.5a does not natively
-consume modern gamepad input, so use a controller mapper that exposes controller
-buttons and sticks as keyboard/mouse input; no mapper executable is distributed
-by Soulforge.
+Connect the controller and run
+`Controller\WoWmapperX\WoWmapperX.exe`, then start Wow.exe directly. Keep both
+processes at the same privilege level; if one runs as Administrator, the other
+must as well. Enable all ConsolePort modules and Soulforge Commander at character
+selection. WoWmapperX converts controller input into the keyboard/mouse input
+the legacy client understands and exports ConsolePort's temporary bindings, so
+normal movement works without replacing keyboard bindings.
 
-Open `/cp config`, enter ConsolePort's Ring Manager, and bind the automatically
-created **Soulforge Commander** ring to one button. Hold that button, flick with
-ConsolePort's radial input toward Follow, Stay, Attack, Tank Pull, Flee, Reset,
-Rebuff, or Companions, and release. **Companions** opens a
+Soulforge automatically forces its managed ring onto ConsolePort's existing
+default utility-ring bar chord: both modifiers plus the lower face button. Hold
+that chord, flick toward Follow, Stay, Attack, Tank Pull, Flee, Reset, Rebuff,
+or Companions, and release. It does not alter `CP_L_*` movement controls.
+`/sfc unbind` restores the prior utility action and `/sfc bind` enables Commander
+there again. **Companions** opens a
 controller-navigable panel that requests the active world's roster. Enable or
 disable entries, choose everyone, a role, or one companion as the command target,
 then choose **Assemble enabled** to invite the party. `/sfc` opens the same panel;
@@ -216,6 +222,11 @@ then choose **Assemble enabled** to invite the party. `/sfc` opens the same pane
 Future server-side companion changes sync without reinstalling or downloading
 the pack. Only addon-code or pinned ConsolePort upgrades require replacing the
 installed folders.
+
+WoWmapperX is an archived and deprecated upstream application included because
+this pack targets the legacy 3.3.5a client. Soulforge validates the exact release
+checksum but cannot attest to third-party executable behavior and never launches
+it automatically. WoWpadX is the upstream author's maintained successor.
 
 The forged companions receive deep-memory profiles automatically. Each
 profile is materialized inside Soul Service as:

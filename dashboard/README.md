@@ -6,7 +6,8 @@ health, AI state, usage, and spend; focused World, Companions, AI Studio, Client
 and Advanced pages keep routine play separate from administration.
 
 Client Addons reports server-side package readiness and downloads one ZIP with
-the pinned ConsolePortLK modules plus Soulforge Commander. It cannot inspect a
+the pinned ConsolePortLK modules, Soulforge Commander, and the legacy Windows
+WoWmapperX controller utility. It cannot inspect a
 remote WoW client's `Interface/AddOns` directory.
 
 It never receives database, bridge, control-agent, Docker, or game-account

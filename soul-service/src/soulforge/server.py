@@ -34,12 +34,18 @@ from .providers import ProviderGateway, SecretCipher
 from .world import WorldRepository
 
 MAX_BODY = 64 * 1024
-CLIENT_PACK_VERSION = "2.0.0"
+CLIENT_PACK_VERSION = "2.1.0"
 CONSOLEPORT_VERSION = "1.5.0-rc2"
 CONSOLEPORT_SHA256 = "9ee20bb1f3c5c5b8d45fcc5980a07bb90d49a707e120613453177c05fea6497f"
 CONSOLEPORT_ROOTS = {
     "ConsolePort", "ConsolePortAdvanced", "ConsolePortBar", "ConsolePortHelp",
     "ConsolePortKeyboard", "ConsolePortLoader", "ConsolePortUI_Loot", "ConsolePortUI_Menu",
+}
+WOWMAPPERX_VERSION = "1.1.0"
+WOWMAPPERX_SHA256 = "a7b60153416584fd52ff2d465cdf35f13c13554bf197e7f0edb7a1542fe676ef"
+WOWMAPPERX_FILES = {
+    "libHarfBuzzSharp.dll", "libSkiaSharp.dll", "WoWmapperX.exe",
+    "WoWmapperX_Updater.exe", "av_libglesv2.dll",
 }
 
 
@@ -690,6 +696,15 @@ class SoulforgeServer(ThreadingHTTPServer):
             "/client-addons/ConsolePortLK-1.5.0-rc2.zip",
         ))
         self.consoleport_sha256 = CONSOLEPORT_SHA256
+        self.wowmapperx_archive = Path(os.environ.get(
+            "SOULFORGE_WOWMAPPERX_ARCHIVE",
+            "/client-addons/WoWmapperX-1.1.0-x86-aot.zip",
+        ))
+        self.wowmapperx_sha256 = WOWMAPPERX_SHA256
+        self.wowmapperx_license = Path(os.environ.get(
+            "SOULFORGE_WOWMAPPERX_LICENSE",
+            "/app/assets/WoWmapperX-LICENSE.txt",
+        ))
         master_key = os.environ.get("SOULFORGE_SECRETS_KEY") or (
             f"development-only:{admin_password}:{secret}"
         )
@@ -1638,6 +1653,38 @@ class SoulHandler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _validated_wowmapperx_files(self, source: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
+        files = [item for item in source.infolist() if not item.is_dir()]
+        names = {item.filename for item in files}
+        if names != WOWMAPPERX_FILES:
+            raise ValueError("WoWmapperX archive contains unexpected files")
+        for item in files:
+            candidate = PurePosixPath(item.filename)
+            if candidate.is_absolute() or ".." in candidate.parts or len(candidate.parts) != 1:
+                raise ValueError(f"unsafe WoWmapperX path: {item.filename}")
+            mode = item.external_attr >> 16
+            if mode & 0o170000 == 0o120000:
+                raise ValueError(f"WoWmapperX symbolic link is not allowed: {item.filename}")
+            with source.open(item) as handle:
+                if handle.read(2) != b"MZ":
+                    raise ValueError(f"WoWmapperX file is not Windows PE: {item.filename}")
+        return files
+
+    def _wowmapperx_ready(self) -> bool:
+        path = self.server.wowmapperx_archive
+        if not path.is_file() or not self.server.wowmapperx_license.is_file():
+            return False
+        try:
+            digest = sha256(path.read_bytes()).hexdigest()
+            if not hmac.compare_digest(digest, self.server.wowmapperx_sha256):
+                return False
+            with zipfile.ZipFile(path) as source:
+                self._validated_wowmapperx_files(source)
+            self.server.wowmapperx_license.read_bytes()
+        except (OSError, ValueError, zipfile.BadZipFile):
+            return False
+        return True
+
     def _addon_metadata(self) -> dict[str, Any]:
         return {
             "pack": {
@@ -1645,7 +1692,11 @@ class SoulHandler(BaseHTTPRequestHandler):
                 "version": CLIENT_PACK_VERSION,
                 "filename": f"AzerothSoulforge-ClientAddons-{CLIENT_PACK_VERSION}.zip",
                 "interface": 30300,
-                "ready": self._consoleport_ready() and self.server.addon_dir.is_dir(),
+                "ready": (
+                    self._consoleport_ready()
+                    and self._wowmapperx_ready()
+                    and self.server.addon_dir.is_dir()
+                ),
             },
             "components": [
                 {
@@ -1664,19 +1715,35 @@ class SoulHandler(BaseHTTPRequestHandler):
                     "sha256": CONSOLEPORT_SHA256,
                     "license": "ConsolePort/LICENSE.md",
                 },
+                {
+                    "id": "wowmapperx",
+                    "name": "WoWmapperX",
+                    "version": WOWMAPPERX_VERSION,
+                    "kind": "controller_mapper",
+                    "platform": "Windows x86",
+                    "path": "Controller/WoWmapperX/WoWmapperX.exe",
+                    "folders": [],
+                    "source": "https://github.com/leoaviana/WoWmapperX",
+                    "sha256": WOWMAPPERX_SHA256,
+                    "license": "Controller/WoWmapperX/LICENSE.txt",
+                    "deprecated": True,
+                    "replacement": "https://github.com/leoaviana/WoWpadX",
+                },
             ],
         }
 
     def _addon_download(self) -> None:
         root = self.server.addon_dir
-        if not root.is_dir() or not self._consoleport_ready():
+        if not root.is_dir() or not self._consoleport_ready() or not self._wowmapperx_ready():
             self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "addon_not_packaged"})
             return
         buffer = io.BytesIO()
         try:
-            with zipfile.ZipFile(self.server.consoleport_archive) as consoleport, zipfile.ZipFile(
-                buffer, "w", compression=zipfile.ZIP_DEFLATED
-            ) as archive:
+            with (
+                zipfile.ZipFile(self.server.consoleport_archive) as consoleport,
+                zipfile.ZipFile(self.server.wowmapperx_archive) as wowmapperx,
+                zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive,
+            ):
                 for item in sorted(self._validated_consoleport_files(consoleport), key=lambda value: value.filename):
                     archive.writestr(item.filename, consoleport.read(item))
                 for path in sorted(root.rglob("*")):
@@ -1684,6 +1751,21 @@ class SoulHandler(BaseHTTPRequestHandler):
                         archive.writestr(
                             f"SoulforgeCommander/{path.relative_to(root).as_posix()}", path.read_bytes()
                         )
+                for item in sorted(self._validated_wowmapperx_files(wowmapperx), key=lambda value: value.filename):
+                    archive.writestr(f"Controller/WoWmapperX/{item.filename}", wowmapperx.read(item))
+                archive.writestr(
+                    "Controller/WoWmapperX/LICENSE.txt",
+                    self.server.wowmapperx_license.read_bytes(),
+                )
+                archive.writestr(
+                    "Controller/WoWmapperX/README-SOULFORGE.txt",
+                    "WoWmapperX 1.1.0 legacy Windows controller mapper\n"
+                    "1. Connect the controller and start WoWmapperX.exe.\n"
+                    "2. Start WoW.exe directly. Keep both at the same privilege level.\n"
+                    "3. WoWmapperX writes temporary ConsolePort bindings; /reload after changes.\n"
+                    "This upstream project is archived and deprecated in favor of WoWpadX.\n"
+                    "Source: https://github.com/leoaviana/WoWmapperX\n",
+                )
                 manifest = (
                     f"Azeroth Soulforge Client Addons {CLIENT_PACK_VERSION}\n"
                     f"Soulforge Commander {CLIENT_PACK_VERSION}\n"
@@ -1692,6 +1774,11 @@ class SoulHandler(BaseHTTPRequestHandler):
                     f"SHA-256: {CONSOLEPORT_SHA256}\n"
                     "ConsolePortLK license: ConsolePort/LICENSE.md\n"
                     "ConsolePortLK is an unmodified third-party dependency and is not affiliated with Azeroth Soulforge.\n"
+                    f"WoWmapperX {WOWMAPPERX_VERSION} legacy Windows x86 NativeAOT mapper\n"
+                    "Source: https://github.com/leoaviana/WoWmapperX\n"
+                    f"SHA-256: {WOWMAPPERX_SHA256}\n"
+                    "WoWmapperX license: Controller/WoWmapperX/LICENSE.txt\n"
+                    "WoWmapperX is archived/deprecated upstream; it is included because this pack targets legacy 3.3.5a.\n"
                 )
                 archive.writestr("CLIENT-ADDONS-MANIFEST.txt", manifest)
         except (OSError, ValueError, zipfile.BadZipFile):

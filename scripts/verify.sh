@@ -23,6 +23,7 @@ required=(
   site/assets/app.js site/.nojekyll .github/workflows/pages.yml
   scripts/validate-pages.py
   scripts/setup-client-addons.sh scripts/validate-consoleport-archive.py
+  scripts/validate-wowmapperx-archive.py soul-service/assets/WoWmapperX-LICENSE.txt
   addons/SoulforgeCommander/SoulforgeCommander.toc
   addons/SoulforgeCommander/SoulforgeCommander.lua
 )
@@ -63,7 +64,8 @@ PYTHONDONTWRITEBYTECODE=1 \
   python3 -m unittest discover -s control-agent/tests -v
 
 PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile \
-  scripts/validate-skill-inference.py scripts/validate-consoleport-archive.py
+  scripts/validate-skill-inference.py scripts/validate-consoleport-archive.py \
+  scripts/validate-wowmapperx-archive.py
 
 python3 scripts/validate-pages.py
 

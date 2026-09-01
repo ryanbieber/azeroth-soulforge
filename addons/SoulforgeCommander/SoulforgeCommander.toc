@@ -2,7 +2,7 @@
 ## Title: Soulforge Commander
 ## Notes: ConsolePortLK command ring and companion manager for Playerbots.
 ## Author: Azeroth Soulforge contributors
-## Version: 2.0.0
+## Version: 2.1.0
 ## RequiredDeps: ConsolePort
 ## SavedVariables: SoulforgeCommanderDB
 SoulforgeCommander.lua

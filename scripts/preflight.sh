@@ -34,6 +34,8 @@ test -f runtime/source/azerothcore/modules/mod-soulbridge/include.sh || fail "So
 test -f runtime/source/azerothcore/modules/mod-ah-bot/conf/mod_ahbot.conf.dist || fail "Auction House Bot source is missing; run make setup"
 test -f runtime/client-addons/ConsolePortLK-1.5.0-rc2.zip || fail "ConsolePortLK client pack is missing; run make setup"
 python3 scripts/validate-consoleport-archive.py runtime/client-addons/ConsolePortLK-1.5.0-rc2.zip >/dev/null || fail "ConsolePortLK client pack is invalid; run make setup"
+test -f runtime/client-addons/WoWmapperX-1.1.0-x86-aot.zip || fail "WoWmapperX controller download is missing; run make setup"
+python3 scripts/validate-wowmapperx-archive.py runtime/client-addons/WoWmapperX-1.1.0-x86-aot.zip >/dev/null || fail "WoWmapperX controller download is invalid; run make setup"
 mkdir -p runtime/azerothcore/etc runtime/azerothcore/logs backups
 docker compose config --quiet
 echo "preflight: complete"

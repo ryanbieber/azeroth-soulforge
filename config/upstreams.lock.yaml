@@ -28,5 +28,13 @@ upstreams:
     release: 1.5.0-rc2
     archive_sha256: 9ee20bb1f3c5c5b8d45fcc5980a07bb90d49a707e120613453177c05fea6497f
     verification_status: archive-and-automated-integration-passed-physical-client-pending-2026-08-31
+  - name: WoWmapperX
+    url: https://github.com/leoaviana/WoWmapperX.git
+    branch: main
+    commit: 89e6c8aa6f5b72b40f85d0eb413356f943f709fa
+    release: 1.1.0
+    asset: wowmapperx-x86-aot.zip
+    archive_sha256: a7b60153416584fd52ff2d465cdf35f13c13554bf197e7f0edb7a1542fe676ef
+    verification_status: archive-layout-and-pe-signatures-passed-runtime-controller-smoke-pending-2026-09-01
 
 # Build evidence and remaining live-smoke limitations are in docs/PROJECT.md.

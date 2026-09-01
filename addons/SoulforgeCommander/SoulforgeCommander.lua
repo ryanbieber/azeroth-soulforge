@@ -5,14 +5,17 @@ if not ConsolePort
   or type(ConsolePort.AddPlugin) ~= "function"
   or type(ConsolePort.GetCustomBindingsForRings) ~= "function"
   or type(ConsolePort.RunOOC) ~= "function"
+  or type(ConsolePort.SetupUtilityBindings) ~= "function"
   or not ConsolePortUtilityToggle then
   DEFAULT_CHAT_FRAME:AddMessage("|cffd5a84bSoulforge:|r ConsolePortLK 1.5.0-rc2 is required. Install the complete Soulforge client addon pack.")
   return
 end
 
 local cpData = ConsolePort:GetData()
-local PACK_VERSION = "2.0.0"
+local PACK_VERSION = "2.1.0"
 local MANAGED_RING = "soulforge.commands.v1"
+local BAR_BUTTON = "CP_R_DOWN"
+local BAR_MODIFIER = "CTRL-SHIFT-"
 local PAGE_SIZE = 8
 local companions, pendingRoster = {}, nil
 local assembleQueue, assembleElapsed = {}, 0
@@ -39,6 +42,7 @@ local staticScopes = {
 local function database()
   SoulforgeCommanderDB = SoulforgeCommanderDB or {}
   SoulforgeCommanderDB.scopeKey = SoulforgeCommanderDB.scopeKey or "all"
+  if SoulforgeCommanderDB.barBindingEnabled == nil then SoulforgeCommanderDB.barBindingEnabled = true end
   return SoulforgeCommanderDB
 end
 
@@ -431,6 +435,44 @@ local function managedRingData()
   return data
 end
 
+local function managedRingBinding(ringID)
+  if tonumber(ringID) == 1 then return "CLICK ConsolePortUtilityToggle:LeftButton" end
+  return "CLICK ConsolePortUtilityToggle:" .. tostring(ringID)
+end
+
+local function applyBarBinding(ring, ringID)
+  local saved = database()
+  cpData.Bindings = cpData.Bindings or {}
+  cpData.Bindings[BAR_BUTTON] = cpData.Bindings[BAR_BUTTON] or {}
+  local buttonBindings = cpData.Bindings[BAR_BUTTON]
+  local wanted = managedRingBinding(ringID)
+
+  if saved.barBindingEnabled then
+    if not saved.previousBarBindingCaptured then
+      saved.previousBarBinding = buttonBindings[BAR_MODIFIER]
+      saved.previousBarBindingCaptured = true
+    end
+    ring.Binding = { Button = BAR_BUTTON, Modifier = BAR_MODIFIER }
+    buttonBindings[BAR_MODIFIER] = wanted
+  else
+    ring.Binding = nil
+    if buttonBindings[BAR_MODIFIER] == wanted then
+      buttonBindings[BAR_MODIFIER] = saved.previousBarBinding
+    end
+  end
+
+  ConsolePort:RunOOC(function()
+    if saved.barBindingEnabled then
+      ConsolePort:SetupUtilityBindings()
+    else
+      ConsolePort:LoadBindingSet(cpData.Bindings, true)
+    end
+    if ConsolePortUtilityToggle and type(ConsolePortUtilityToggle.Refresh) == "function" then
+      ConsolePortUtilityToggle:Refresh()
+    end
+  end)
+end
+
 local function ensureManagedRing()
   ConsolePortUtility = ConsolePortUtility or {}
   local ring, ringID
@@ -452,11 +494,7 @@ local function ensureManagedRing()
   ring.SoulforgeManaged = MANAGED_RING
   ring.Data = managedRingData()
   database().ringID = ringID
-  ConsolePort:RunOOC(function()
-    if ConsolePortUtilityToggle and type(ConsolePortUtilityToggle.Refresh) == "function" then
-      ConsolePortUtilityToggle:Refresh()
-    end
-  end)
+  applyBarBinding(ring, ringID)
 end
 
 ConsolePort:AddPlugin("SoulforgeCommander", function(self)
@@ -520,6 +558,14 @@ SlashCmdList.SOULFORGECOMMANDER = function(message)
       "|cffd5a84bSoulforge:|r ConsolePort ring " .. tostring(database().ringID or "pending")
       .. ", " .. #companions .. " companions, target " .. currentScope().label .. "."
     )
+  elseif message == "bind" then
+    database().barBindingEnabled = true
+    ensureManagedRing()
+    DEFAULT_CHAT_FRAME:AddMessage("|cffd5a84bSoulforge:|r Commander restored to the default utility-ring bar chord.")
+  elseif message == "unbind" then
+    database().barBindingEnabled = false
+    ensureManagedRing()
+    DEFAULT_CHAT_FRAME:AddMessage("|cffd5a84bSoulforge:|r Commander bar chord removed and the prior ConsolePort action restored.")
   else
     configPanel:Show()
   end

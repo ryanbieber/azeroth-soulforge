@@ -264,6 +264,10 @@ class HealthServerTests(unittest.TestCase):
             "ConsolePort", "ConsolePortAdvanced", "ConsolePortBar", "ConsolePortHelp",
             "ConsolePortKeyboard", "ConsolePortLoader", "ConsolePortUI_Loot", "ConsolePortUI_Menu",
         }
+        mapper_files = {
+            "libHarfBuzzSharp.dll", "libSkiaSharp.dll", "WoWmapperX.exe",
+            "WoWmapperX_Updater.exe", "av_libglesv2.dll",
+        }
         with tempfile.TemporaryDirectory() as directory:
             consoleport = Path(directory) / "ConsolePortLK.zip"
             with zipfile.ZipFile(consoleport, "w") as fixture:
@@ -272,6 +276,15 @@ class HealthServerTests(unittest.TestCase):
                 fixture.writestr("ConsolePort/LICENSE.md", "Artistic License 2.0 fixture")
             self.server.consoleport_archive = consoleport
             self.server.consoleport_sha256 = hashlib.sha256(consoleport.read_bytes()).hexdigest()
+            wowmapperx = Path(directory) / "WoWmapperX.zip"
+            with zipfile.ZipFile(wowmapperx, "w") as fixture:
+                for name in mapper_files:
+                    fixture.writestr(name, b"MZfixture")
+            license_file = Path(directory) / "WoWmapperX-LICENSE.txt"
+            license_file.write_text("MIT License fixture", encoding="utf-8")
+            self.server.wowmapperx_archive = wowmapperx
+            self.server.wowmapperx_sha256 = hashlib.sha256(wowmapperx.read_bytes()).hexdigest()
+            self.server.wowmapperx_license = license_file
 
             _, headers = self._request(
                 "POST", "/admin/v1/session", {"password": "test-admin-password"}, include_headers=True
@@ -281,24 +294,30 @@ class HealthServerTests(unittest.TestCase):
                 "GET", "/admin/v1/addons", headers={"Cookie": cookie}, include_headers=True
             )
             self.assertTrue(metadata["pack"]["ready"])
-            self.assertEqual(metadata["pack"]["version"], "2.0.0")
+            self.assertEqual(metadata["pack"]["version"], "2.1.0")
             self.assertEqual(metadata["components"][1]["version"], "1.5.0-rc2")
+            self.assertEqual(metadata["components"][2]["version"], "1.1.0")
+            self.assertTrue(metadata["components"][2]["deprecated"])
 
             request = Request(
                 f"{self.base_url}/admin/v1/addon/download", headers={"Cookie": cookie}
             )
             with urlopen(request, timeout=2) as response:
                 archive_bytes = response.read()
-                self.assertIn("AzerothSoulforge-ClientAddons-2.0.0.zip", response.headers["Content-Disposition"])
+                self.assertIn("AzerothSoulforge-ClientAddons-2.1.0.zip", response.headers["Content-Disposition"])
             with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
                 files = archive.namelist()
                 source = archive.read("SoulforgeCommander/SoulforgeCommander.lua").decode()
                 toc = archive.read("SoulforgeCommander/SoulforgeCommander.toc").decode()
                 manifest = archive.read("CLIENT-ADDONS-MANIFEST.txt").decode()
-            self.assertEqual({name.split("/", 1)[0] for name in files} - {
-                "SoulforgeCommander", "CLIENT-ADDONS-MANIFEST.txt",
-            }, roots)
+            self.assertEqual(
+                {name.split("/", 1)[0] for name in files},
+                roots | {"SoulforgeCommander", "Controller", "CLIENT-ADDONS-MANIFEST.txt"},
+            )
             self.assertIn("ConsolePort/LICENSE.md", files)
+            self.assertIn("Controller/WoWmapperX/WoWmapperX.exe", files)
+            self.assertIn("Controller/WoWmapperX/LICENSE.txt", files)
+            self.assertIn("Controller/WoWmapperX/README-SOULFORGE.txt", files)
             self.assertNotIn("SoulforgeCommander/Bindings.xml", files)
             self.assertNotIn("Firstbot", source)
             self.assertIn(".soulforge roster", source)
@@ -306,10 +325,15 @@ class HealthServerTests(unittest.TestCase):
             self.assertIn("SoulforgeManaged", source)
             self.assertIn('action = "custom"', source)
             self.assertIn('command = "companions"', source)
+            self.assertIn('BAR_BUTTON = "CP_R_DOWN"', source)
+            self.assertIn('BAR_MODIFIER = "CTRL-SHIFT-"', source)
+            self.assertIn("ConsolePort:SetupUtilityBindings()", source)
+            self.assertNotIn("CP_L_", source)
             self.assertNotIn("wheelMode", source)
             self.assertIn("## RequiredDeps: ConsolePort", toc)
-            self.assertIn("## Version: 2.0.0", toc)
+            self.assertIn("## Version: 2.1.0", toc)
             self.assertIn("ConsolePortLK 1.5.0-rc2", manifest)
+            self.assertIn("WoWmapperX 1.1.0", manifest)
 
         roster = self._signed_get("/v1/companion-roster?realm_id=azeroth-soulforge")
         self.assertEqual(roster["companions"], [

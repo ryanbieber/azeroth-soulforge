@@ -15,6 +15,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY soul-service/pyproject.toml soul-service/README.md ./
 COPY soul-service/src ./src
+COPY soul-service/assets ./assets
 COPY addons /app/addons
 COPY --from=dashboard-build /dashboard/dist /app/dashboard
 RUN pip install --no-cache-dir .

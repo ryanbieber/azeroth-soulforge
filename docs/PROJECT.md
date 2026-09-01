@@ -243,10 +243,12 @@ encrypted at rest and never returned to the browser. Progression controls remain
 absent until backup verification and restore testing are automated.
 
 The repository ships Soulforge Commander as a required ConsolePortLK 1.5.0-rc2
-plugin. Setup downloads the exact checksum-pinned upstream archive into ignored
-runtime storage, and the authenticated dashboard assembles it with Soulforge
-Commander as one client pack. The plugin registers a managed ConsolePort ring
-for seven Playerbots orders plus a controller-navigable Companions panel. It has
+plugin. Setup downloads exact checksum-pinned ConsolePortLK and legacy Windows
+WoWmapperX archives into ignored runtime storage, and the authenticated dashboard
+assembles them with Soulforge Commander as one client pack. The plugin registers
+a managed ConsolePort ring for seven Playerbots orders plus a
+controller-navigable Companions panel. The ring takes ConsolePort's default
+utility-ring bar chord without changing movement bindings. It has
 no network or AI authority and every command remains user initiated. General
 macros remain a troubleshooting fallback.
 
@@ -285,7 +287,7 @@ only when existing consumers remain safe.
 | Dashboard | Alpha | Authenticated HTTPS React control plane and safe admin workflows |
 | Prompted fresh world | Alpha | Immutable seed, canon, dungeon group and narrative plans persist |
 | Provider routing and usage | Alpha | Local/paid adapters, kill switch and usage ledger pass tests |
-| Soulforge Commander | Alpha | Pinned ConsolePortLK plugin and combined client pack pass automated checks; physical-client smoke pending |
+| Soulforge Commander | Alpha | Pinned ConsolePortLK/WoWmapperX pack, managed bar binding, and addon checks pass; physical-client smoke pending |
 | Public setup documentation | Complete | Beginner guide deploys through GitHub Pages |
 | Progression integration | Alpha | Initial level-19 phase configured; later unlock workflow pending |
 | Guild acceptance | Not started | Eight-hour, 40-soul soak criteria pass |
@@ -868,3 +870,33 @@ On 2026-08-31, `./scripts/setup-client-addons.sh` verified the exact release
 archive and `./scripts/verify.sh` passed 26 Soul Service tests, 13 control-agent
 tests, static-site validation, the React production build, Lua parsing, Compose
 validation, and the Soulbridge C++ build/test on the current Linux host.
+
+### 2026-09-01 — Bundle legacy WoWmapperX and bind Commander through ConsolePort
+
+**Decision:** Add the official WoWmapperX 1.1.0 x86 NativeAOT release asset to
+the authenticated client pack at `Controller/WoWmapperX`, pinned to tag commit
+`89e6c8aa6f5b72b40f85d0eb413356f943f709fa` and SHA-256
+`a7b60153416584fd52ff2d465cdf35f13c13554bf197e7f0edb7a1542fe676ef`.
+Soulforge Commander 2.1 forces its managed ring onto ConsolePort's default
+utility-ring chord (`CTRL-SHIFT-` + `CP_R_DOWN`) through
+`SetupUtilityBindings`, which also refreshes ConsolePortBar. It records the
+prior action and exposes `/sfc unbind` and `/sfc bind` for reversible control.
+
+**Reason:** The legacy client does not consume modern controller input itself;
+without a mapper, movement appears broken even when ConsolePort addons load.
+Binding the ring only in saved ring data also left it absent from the active
+ConsolePort binding set and bars.
+
+**Consequence:** The generated pack separates addon folders from the Windows
+controller executable, validates exact archive contents and PE signatures, and
+preserves the MIT notice. WoWmapperX is archived and deprecated upstream in
+favor of WoWpadX, is labeled accordingly, and is never auto-executed. Commander
+changes only the existing utility-ring chord; `CP_L_*` movement and ordinary
+action bindings remain untouched. Automated packaging and source checks do not
+replace a physical controller/client smoke test, which remains pending.
+On 2026-09-01, both pinned runtime archives passed checksum, path, license/API,
+and executable-signature validation; `./scripts/verify.sh` passed 26 Soul Service
+tests, 13 control-agent tests, Pages validation, the React build, Lua parsing,
+Compose rendering, and the C++ bridge test. A live authenticated HTTPS download
+returned pack 2.1.0 with all expected top-level roots, Commander 2.1, the
+WoWmapperX PE payload, and its MIT notice.
