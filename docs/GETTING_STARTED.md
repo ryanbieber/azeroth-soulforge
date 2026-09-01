@@ -126,10 +126,11 @@ and never returned to the browser. Set an optional monthly cap and use the globa
 switch to stop new AI calls. Do not publish this dashboard through a router or
 public tunnel.
 
-Under **Settings → Gameplay rates**, multipliers from 0.1×–10× control XP,
-reputation, item loot, money drops, and honor. Profession skill gain accepts
-whole-number multipliers from 1×–10×. Applying a rate safely restarts the
-worldserver; it does not unlock progression brackets or raise the bot level cap.
+Under **Advanced → Experience**, **XP scaling** accepts a multiplier from
+0.1×–10×. It applies consistently to kills, quests, exploration, pet XP, and
+battleground XP. Applying it safely restarts the worldserver; it does not unlock
+progression brackets, raise the bot level cap, or change existing character
+levels.
 
 Under **Settings → Realm**, **New character boost level** controls the starting
 level for characters created after you apply the setting. Set it to `55` when

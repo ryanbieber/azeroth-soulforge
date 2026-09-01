@@ -900,3 +900,23 @@ tests, 13 control-agent tests, Pages validation, the React build, Lua parsing,
 Compose rendering, and the C++ bridge test. A live authenticated HTTPS download
 returned pack 2.1.0 with all expected top-level roots, Commander 2.1, the
 WoWmapperX PE payload, and its MIT notice.
+
+### 2026-09-01 — Expose bounded XP scaling in Advanced
+
+**Decision:** Add an XP scaling control to the dashboard's Advanced page using
+the existing `xp_rate` administration setting and its 0.1×–10× boundary.
+
+**Reason:** The server already applies one validated multiplier across kill,
+quest, exploration, pet, and battleground XP, but the React dashboard did not
+expose it and did not normalize edited numeric input before submission.
+
+**Consequence:** Applying XP scaling persists the grouped AzerothCore rate keys
+and restarts worldserver when it is running. It does not alter existing levels,
+progression brackets, or bot level caps. The browser always submits `xp_rate` as
+a JSON number.
+On 2026-09-01, `./scripts/verify.sh` passed all 26 Soul Service tests, 13
+control-agent tests (including grouped decimal XP rates and boundary rejection),
+Pages validation, the React production build, Compose validation, and the C++
+bridge test. The deployed dashboard bundle exposed the control, the authenticated
+settings API reported `2.5`, all 12 active `Rate.XP.*` keys were `2.5`, and auth
+and worldserver returned healthy with ports 3724 and 8085 reachable.
