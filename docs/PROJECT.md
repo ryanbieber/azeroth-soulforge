@@ -969,3 +969,34 @@ SQLite database contained all six new social/session tables and a local
 database, authserver, worldserver, Soul Service, gateway, control agent, and
 Ollama all reported healthy; worldserver reached ready state and logged the
 Soulbridge worker connection to Soul Service.
+
+### 2026-09-02 — Favor socially meaningful chatter and bounded current events
+
+**Decision:** Stop producing routine quest-completion events and ordinary level
+events. Soulbridge now emits quest reactions only for group-worthy elite,
+dungeon, raid, heroic, or legendary quests, and level reactions only at levels
+10, 20, 40, 60, 70, and 80. Soul Service repeats those checks before inference.
+Ambient prompts explicitly favor dungeon/elite LFG, trade, arguments, and local
+culture over solo errands. An optional BBC News RSS title cache refreshes every
+30 minutes on a separate Soul Service thread and is sampled into 15 percent of
+ambient replies by default.
+
+**Reason:** Treating every turn-in and level as socially important made the
+realm sound like a quest log instead of player chat. A small amount of actual
+headline context supports timely, chaotic discussion without asking the model
+to hallucinate what is current. Full companion character guidance must also be
+available to event reactions and second-speaker banter, not only direct replies.
+
+**Consequence:** No feed request or inference runs on AzerothCore's world update
+thread. The cache stores at most eight titles, reads at most 256 KiB, never
+stores article bodies, retains the prior cache on a refresh failure, and limits
+the configurable source to the supported BBC HTTPS host to avoid an admin-side
+request-forgery primitive. Headline prompts label titles as factual context and
+allow messy fictional opinions while forbidding invented details as news,
+threats, slurs, and celebration of real violence. Fresh world generation now
+produces concrete owner-editable `roleplay_guidance`, which is used in direct
+dialogue, gameplay reactions, and bounded companion banter.
+On 2026-09-02, 33 Soul Service tests, 13 control-agent tests, Pages validation,
+the React production build, Compose rendering, shell/Lua checks, and the C++
+queue test passed. The synchronized pinned AzerothCore tree then compiled and
+linked the complete worldserver with the updated Soulbridge gameplay hooks.

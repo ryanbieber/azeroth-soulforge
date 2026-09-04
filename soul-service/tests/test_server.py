@@ -251,6 +251,43 @@ class HealthServerTests(unittest.TestCase):
             self.server._ambient_dialogue(event)
         self.assertEqual(self.server.store.pending("test", 5), [])
 
+    def test_current_headlines_are_bounded_and_added_to_ambient_prompt(self) -> None:
+        rss = b"<rss><channel><item><title>First headline</title></item><item><title>Second headline</title></item></channel></rss>"
+        with patch("soulforge.server.urlopen", return_value=io.BytesIO(rss)):
+            self.assertEqual(self.server._refresh_current_events(), 2)
+        event = {
+            "event_id": str(uuid4()), "realm_id": "test", "event_type": "chat.channel",
+            "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+            "participants": [{"guid": "99", "kind": "playerbot", "name": "Hottake"}],
+            "channel": "channel", "text": "what is everyone arguing about?",
+            "context": {"dialogue_tier": "ambient", "channel_name": "General - The Barrens",
+                        "zone_name": "The Barrens", "zone_id": 17},
+            "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+        }
+        self.server.store.accept(event, json.dumps(event))
+        observed = {}
+        self.server._route_generation = lambda purpose, prompt: observed.update(prompt=prompt) or "bad take incoming"
+        with patch("soulforge.server.secrets.randbelow", return_value=0):
+            self.server._ambient_dialogue(event)
+        self.assertIn("First headline", observed["prompt"])
+        self.assertIn("do not invent extra facts", observed["prompt"])
+        self.assertIn("Ordinary solo quests", observed["prompt"])
+
+    def test_mundane_gameplay_events_never_reach_inference(self) -> None:
+        for event_type, context in (("quest.complete", {"quest_id": "3903"}),
+                                    ("character.level", {"new_level": "11"})):
+            event = {
+                "event_id": str(uuid4()), "realm_id": "test", "event_type": event_type,
+                "actor": {"guid": "1", "kind": "human", "name": "Owner"},
+                "participants": [{"guid": "2", "kind": "soul", "name": "Companion"}],
+                "channel": "party", "text": "routine event", "context": context,
+                "trace": {"trace_id": str(uuid4()), "origin": "human", "hop_count": 0},
+            }
+            self.server.store.accept(event, json.dumps(event))
+            self.server._route_generation = lambda *_: self.fail("mundane event reached inference")
+            self.server._social_event(event)
+        self.assertEqual(self.server.store.pending("test", 5), [])
+
     def test_ambient_random_bot_allows_shared_city_trade(self) -> None:
         event = {
             "event_id": str(uuid4()), "realm_id": "test", "event_type": "chat.channel",

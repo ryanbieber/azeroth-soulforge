@@ -67,14 +67,23 @@ class WorldRepositoryTests(unittest.TestCase):
         defaults = self.worlds.ai_state()
         self.assertEqual(defaults["ambient_reply_percent"], 25)
         self.assertEqual(defaults["ambient_cooldown_seconds"], 5)
+        self.assertTrue(defaults["current_events_enabled"])
+        self.assertEqual(defaults["current_events_percent"], 15)
         state = self.worlds.save_ai_state({"enabled": False, "monthly_cap_micros": 500_000,
                                            "auto_stop_minutes": 15, "ambient_enabled": True,
-                                           "ambient_reply_percent": 7, "ambient_cooldown_seconds": 45})
+                                           "ambient_reply_percent": 7, "ambient_cooldown_seconds": 45,
+                                           "current_events_enabled": True,
+                                           "current_events_percent": 20,
+                                           "current_events_feed_url":
+                                           "https://feeds.bbci.co.uk/news/world/rss.xml"})
         self.assertFalse(state["enabled"])
         self.assertEqual(state["monthly_cap_micros"], 500_000)
         self.assertEqual(state["auto_stop_minutes"], 15)
         self.assertEqual(state["ambient_reply_percent"], 7)
         self.assertEqual(state["ambient_cooldown_seconds"], 45)
+        self.assertEqual(state["current_events_percent"], 20)
+        with self.assertRaisesRegex(ValueError, "supported BBC News"):
+            self.worlds.save_ai_state({"current_events_feed_url": "https://127.0.0.1/feed"})
         self.assertEqual(self.worlds.routes()["ambient"]["model"], "qwen3:1.7b")
         self.assertEqual(self.worlds.routes()["ambient"]["max_tokens"], 96)
         self.assertEqual(self.worlds.routes()["social"]["model"], "qwen3:1.7b")

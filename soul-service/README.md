@@ -51,9 +51,13 @@ channel name, so General and LocalDefense remain local. The built-in `Trade -
 City` channel is also eligible because the game only makes it available in
 trade-enabled cities and shares it across those cities. World and
 LookingForGroup are ignored. The compact prompt includes the actual zone and
-channel and asks for era-appropriate, zone-specific realm culture without
-storing deep personal memory for disposable population bots. AI Studio exposes
-the route, reply chance, cooldown, and per-companion prompt previews.
+channel and favors dungeons, elite groups, trade, arguments, and local jokes
+over routine solo quests or ordinary level chatter. An optional off-thread
+30-minute BBC News RSS cache supplies bounded headline titles to a configurable
+share of ambient prompts for current-event hot takes; feed failure never blocks
+chat or game operation. Disposable population bots receive no deep personal
+memory. AI Studio exposes the route, reply chance, cooldown, headline controls,
+and per-companion prompt previews.
 
 Companion, ambient, and companion-to-companion prompts request only the literal
 first-person words the character would type into WoW chat. A final delivery

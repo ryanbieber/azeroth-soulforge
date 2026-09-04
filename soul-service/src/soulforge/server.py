@@ -24,6 +24,7 @@ import sqlite3
 from threading import Lock, Thread
 import time
 from typing import Any
+import xml.etree.ElementTree as ET
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import Request, urlopen
@@ -743,9 +744,14 @@ class SoulforgeServer(ThreadingHTTPServer):
         self._auto_stop_fired = False
         self._ambient_lock = Lock()
         self._last_ambient_reply = 0.0
+        self._current_events_lock = Lock()
+        self._current_events: list[str] = []
+        self._current_events_updated_at = 0.0
         if start_worker:
             Thread(target=self._worker, daemon=True, name="soulforge-inference").start()
             Thread(target=self._presence_monitor, daemon=True, name="soulforge-presence").start()
+            Thread(target=self._current_events_monitor, daemon=True,
+                   name="soulforge-current-events").start()
 
     def _worker(self) -> None:
         while True:
@@ -878,13 +884,28 @@ class SoulforgeServer(ThreadingHTTPServer):
         world = self.worlds.active_world() or {}
         canon = world.get("canon") or {}
         flavor = str(canon.get("regional_flavor") or canon.get("tone") or canon.get("premise") or "classic Azeroth")[:240]
+        headline_context = ""
+        if state["current_events_enabled"] and secrets.randbelow(100) < state["current_events_percent"]:
+            with self._current_events_lock:
+                headlines = self._current_events[:3]
+            if headlines:
+                headline_context = (
+                    "\nVerified current headline context (titles only; do not invent extra facts): "
+                    + json.dumps(headlines, ensure_ascii=False)
+                    + " React as a messy player with a personal hot take: funny, overconfident, argumentative, "
+                      "or conspiracy-flavored speculation is welcome when clearly opinion. No slurs, threats, "
+                      "or celebration of real violence. Do not present invented details as news.\n"
+                )
         prompt = (
             f"You are {bot['name']}, an ordinary player on a busy 2004-2009-era World of Warcraft realm. "
             f"You are in {zone}, reading {channel_name}. World flavor: {flavor}. "
-            "Make the realm feel inhabited: react like a real player of that era with zone-aware quest help, "
-            "LFG/trade chatter, arguments, local jokes, rumors, typos, playful item-or-spell-link wordplay, or "
+            "Make the realm feel inhabited: react like a real player of that era with dungeon or elite-quest LFG, "
+            "trade chatter, arguments, local jokes, rumors, typos, playful item-or-spell-link wordplay, or "
             "occasional nonsense. Barrens chat may be especially chaotic. Do not force a famous meme every time. "
+            "Ordinary solo quests, routine leveling, and mundane errands are not interesting conversation; do not "
+            "bring them up unless the player explicitly asks for help. "
             f"{event['actor']['name']} says: {event['text'][:300]}\n"
+            f"{headline_context}"
             f"Output only the exact words {bot['name']} would type into the WoW chat box, speaking as "
             f"{bot['name']} in first person. Reply naturally in one or two short chat lines, usually under "
             "45 words. Do not add a speaker label, quotation marks around the reply, narration, stage "
@@ -896,6 +917,47 @@ class SoulforgeServer(ThreadingHTTPServer):
             self.store.dismiss(event["event_id"])
             return
         self.store.complete_ambient(event, reply)
+
+    def _refresh_current_events(self) -> int:
+        state = self.worlds.ai_state()
+        if not state["current_events_enabled"]:
+            with self._current_events_lock:
+                self._current_events = []
+            return 0
+        request = Request(state["current_events_feed_url"], headers={
+            "User-Agent": "Azeroth-Soulforge/1.0 (+https://github.com/ryanbieber/azeroth-soulforge)"
+        })
+        with urlopen(request, timeout=8) as response:
+            body = response.read(256 * 1024 + 1)
+        if len(body) > 256 * 1024:
+            raise ValueError("current-events feed exceeded 256 KiB")
+        root = ET.fromstring(body)
+        headlines: list[str] = []
+        for item in root.findall(".//item")[:20]:
+            title = " ".join((item.findtext("title") or "").split())[:180]
+            if title and title not in headlines:
+                headlines.append(title)
+            if len(headlines) == 8:
+                break
+        if not headlines:
+            raise ValueError("current-events feed contained no headlines")
+        with self._current_events_lock:
+            self._current_events = headlines
+            self._current_events_updated_at = time.time()
+        print(f"current_events refreshed headlines={len(headlines)}", flush=True)
+        return len(headlines)
+
+    def _current_events_monitor(self) -> None:
+        while True:
+            self._refresh_current_events_safely()
+            time.sleep(1800)
+
+    def _refresh_current_events_safely(self) -> int:
+        try:
+            return self._refresh_current_events()
+        except Exception as error:
+            print(f"current_events refresh_failed error={type(error).__name__}", flush=True)
+            return 0
 
     def _banter_followup(self, event: dict[str, Any], first_reply: str) -> None:
         companions = self.worlds.companions()
@@ -930,6 +992,7 @@ class SoulforgeServer(ThreadingHTTPServer):
             f"You are {responder['name']}; output only the literal words they type, at most 35 words. "
             "No label, narration, emote, stage direction, AI mention, or gameplay command. Do not merely agree.\n"
             f"Voice: {responder['voice']}. Mood: {responder['mood']}. Concern: {responder['concern']}.\n"
+            f"Character guidance: {str(responder.get('skill_document') or '')[:4000]}\n"
             f"Relationships: {json.dumps(social['relationships'][:12], ensure_ascii=False)}\n"
             f"Player: {event.get('text','')[:400]}\n{event['participants'][0]['name']}: {first_reply[:400]}"
         )
@@ -944,6 +1007,18 @@ class SoulforgeServer(ThreadingHTTPServer):
             )
 
     def _social_event(self, event: dict[str, Any]) -> None:
+        context = event.get("context", {})
+        if event.get("event_type") == "quest.complete" and context.get("socially_notable") != "true":
+            self.store.dismiss(event["event_id"])
+            return
+        if event.get("event_type") == "character.level":
+            try:
+                level = int(context.get("new_level", 0))
+            except (TypeError, ValueError):
+                level = 0
+            if level not in {10, 20, 40, 60, 70, 80}:
+                self.store.dismiss(event["event_id"])
+                return
         companions = self.worlds.companions()
         participant_guids = {str(item.get("guid")) for item in event.get("participants", [])}
         eligible = [item for item in companions if str(item["bot_guid"]) in participant_guids]
@@ -981,6 +1056,7 @@ class SoulforgeServer(ThreadingHTTPServer):
             "first-person words typed in chat: no label, narration, emote, stage direction, AI mention, or "
             "gameplay command. Do not summarize data mechanically.\n"
             f"Voice: {speaker['voice']}. Mood: {speaker['mood']}. Event tone: {decision.get('tone','natural')}.\n"
+            f"Character guidance: {str(speaker.get('skill_document') or '')[:4000]}\n"
             f"World canon: {json.dumps(world.get('canon', {}), ensure_ascii=False)[:3000]}\n"
             f"Gameplay event: {json.dumps(event, ensure_ascii=False)[:4000]}"
         )
@@ -1078,7 +1154,9 @@ class SoulforgeServer(ThreadingHTTPServer):
             "story beats; never invent gameplay rewards, quests, or commands. Return strict JSON with "
             "keys premise, tone, social_rules, regional_flavor, factions, dialogue_guidance, taboos, "
             "themes, starting_tensions (array), initial_plans (array of title, hint, after_played_minutes), "
-            "and companion_profiles (array of bot_guid, archetype, voice, values). Base companion profiles "
+            "and companion_profiles (array of bot_guid, archetype, voice, values, roleplay_guidance). "
+            "Make roleplay_guidance concrete: recurring worldview, comic rhythm, favored metaphors, reactions "
+            "to wins and setbacks, and behaviors to avoid. Base companion profiles "
             "only on these available character facts:\n"
             f"{json.dumps(bots[:200], ensure_ascii=False)}\n"
             f"Faction: {request['faction']}; player role: {request['player_role']}.\n"
@@ -1527,6 +1605,9 @@ class SoulHandler(BaseHTTPRequestHandler):
                     result = self.server.worlds.save_ai_state(payload)
                     self.server.ai_enabled = result["enabled"]
                     self.server.souls_enabled = result["enabled"]
+                    if result["current_events_enabled"]:
+                        Thread(target=self.server._refresh_current_events_safely, daemon=True,
+                               name="soulforge-current-events-refresh").start()
                 else:
                     result = {"routes": self.server.worlds.save_routes(payload)}
                 self._json(HTTPStatus.OK, result)

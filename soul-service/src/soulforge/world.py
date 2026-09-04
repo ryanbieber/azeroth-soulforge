@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import re
 from typing import Any
+from urllib.parse import urlparse
 from uuid import uuid4
 
 
@@ -319,6 +320,9 @@ class WorldRepository:
                 "values_text": str(generated.get("values", "loyalty, courage, shared history")),
                 "enabled": True,
             })
+            guidance = str(generated.get("roleplay_guidance", "")).strip()
+            if guidance:
+                self.store.update_skill_document(REALM_ID, guid, guidance[:12000])
         return self.active_world() or {}
 
     def memories(self, limit: int = 100) -> list[dict[str, Any]]:
@@ -760,6 +764,11 @@ class WorldRepository:
             "ambient_enabled": settings.get("ambient_enabled", "true") == "true",
             "ambient_reply_percent": int(settings.get("ambient_reply_percent", "25")),
             "ambient_cooldown_seconds": int(settings.get("ambient_cooldown_seconds", "5")),
+            "current_events_enabled": settings.get("current_events_enabled", "true") == "true",
+            "current_events_percent": int(settings.get("current_events_percent", "15")),
+            "current_events_feed_url": settings.get(
+                "current_events_feed_url", "https://feeds.bbci.co.uk/news/world/rss.xml"
+            ),
         }
 
     def save_ai_state(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -770,6 +779,11 @@ class WorldRepository:
         ambient_enabled = payload.get("ambient_enabled", current["ambient_enabled"])
         ambient_percent = payload.get("ambient_reply_percent", current["ambient_reply_percent"])
         ambient_cooldown = payload.get("ambient_cooldown_seconds", current["ambient_cooldown_seconds"])
+        current_events_enabled = payload.get("current_events_enabled", current["current_events_enabled"])
+        current_events_percent = payload.get("current_events_percent", current["current_events_percent"])
+        current_events_feed_url = str(payload.get(
+            "current_events_feed_url", current["current_events_feed_url"]
+        )).strip()
         if not isinstance(enabled, bool) or isinstance(cap, bool) or not isinstance(cap, int) or cap < 0:
             raise ValueError("invalid AI state")
         if isinstance(auto_stop, bool) or not isinstance(auto_stop, int) or not 0 <= auto_stop <= 120:
@@ -780,6 +794,17 @@ class WorldRepository:
             raise ValueError("ambient_reply_percent must be between 0 and 25")
         if isinstance(ambient_cooldown, bool) or not isinstance(ambient_cooldown, int) or not 5 <= ambient_cooldown <= 600:
             raise ValueError("ambient_cooldown_seconds must be between 5 and 600")
+        if not isinstance(current_events_enabled, bool):
+            raise ValueError("current_events_enabled must be boolean")
+        if (isinstance(current_events_percent, bool) or not isinstance(current_events_percent, int)
+                or not 0 <= current_events_percent <= 100):
+            raise ValueError("current_events_percent must be between 0 and 100")
+        parsed_feed = urlparse(current_events_feed_url)
+        if (parsed_feed.scheme != "https" or not parsed_feed.hostname
+                or len(current_events_feed_url) > 500 or parsed_feed.username or parsed_feed.password):
+            raise ValueError("current_events_feed_url must be a public HTTPS URL")
+        if parsed_feed.hostname != "feeds.bbci.co.uk":
+            raise ValueError("current_events_feed_url must use the supported BBC News feed host")
         self.store.set_settings({
             "ai_enabled": "true" if enabled else "false",
             "souls_enabled": "true" if enabled else "false",
@@ -788,6 +813,9 @@ class WorldRepository:
             "ambient_enabled": "true" if ambient_enabled else "false",
             "ambient_reply_percent": str(ambient_percent),
             "ambient_cooldown_seconds": str(ambient_cooldown),
+            "current_events_enabled": "true" if current_events_enabled else "false",
+            "current_events_percent": str(current_events_percent),
+            "current_events_feed_url": current_events_feed_url,
         })
         return self.ai_state()
 

@@ -98,10 +98,10 @@ paths:
       responses: {"200": {description: AI routes saved}}
   /ai/state:
     get:
-      summary: Return global safeguards plus ambient reply probability and cooldown
+      summary: Return global safeguards plus ambient and current-events controls
       responses: {"200": {description: AI safeguards}}
     put:
-      summary: Update global safeguards or ambient reply controls
+      summary: Update global safeguards, ambient reply controls, or the supported HTTPS headline feed
       responses: {"200": {description: AI safeguards saved}}
   /ai/usage:
     get:

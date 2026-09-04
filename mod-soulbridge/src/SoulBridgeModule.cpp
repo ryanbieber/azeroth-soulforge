@@ -806,10 +806,17 @@ public:
 
     void OnPlayerCompleteQuest(Player* player, Quest const* quest) override
     {
-        if (player && !GET_PLAYERBOT_AI(player) && quest)
+        if (!player || GET_PLAYERBOT_AI(player) || !quest)
+            return;
+        uint32 type = quest->GetType();
+        bool notable = quest->GetSuggestedPlayers() > 1 || type == QUEST_TYPE_ELITE ||
+            type == QUEST_TYPE_DUNGEON || type == QUEST_TYPE_HEROIC ||
+            type == QUEST_TYPE_RAID || type == QUEST_TYPE_RAID_10 ||
+            type == QUEST_TYPE_RAID_25 || type == QUEST_TYPE_LEGENDARY;
+        if (notable)
             Bridge::Instance().EnqueueGameplay(player, "quest.complete",
                 player->GetName() + " completed " + quest->GetTitle() + ".",
-                "quest_id", std::to_string(quest->GetQuestId()));
+                "socially_notable", "true");
     }
 
     void OnPlayerCreatureKill(Player* player, Creature* killed) override
@@ -822,7 +829,9 @@ public:
 
     void OnPlayerLevelChanged(Player* player, uint8 oldLevel) override
     {
-        if (player && !GET_PLAYERBOT_AI(player) && player->GetLevel() > oldLevel)
+        if (player && !GET_PLAYERBOT_AI(player) && player->GetLevel() > oldLevel &&
+            (player->GetLevel() == 10 || player->GetLevel() == 20 || player->GetLevel() == 40 ||
+             player->GetLevel() == 60 || player->GetLevel() == 70 || player->GetLevel() == 80))
             Bridge::Instance().EnqueueGameplay(player, "character.level",
                 player->GetName() + " reached level " + std::to_string(player->GetLevel()) + ".",
                 "new_level", std::to_string(player->GetLevel()));

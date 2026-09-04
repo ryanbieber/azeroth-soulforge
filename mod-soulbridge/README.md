@@ -17,7 +17,9 @@ bot-to-bot reply chain.
 
 The same bounded queue captures compact social gameplay signals for a human and
 their controlled Playerbots: player or companion death, resurrection, human
-level-up, quest completion, and dungeon/world-boss kills. Hooks only assemble
+major level milestones, group-worthy elite/dungeon/raid quest completions, and
+dungeon/world-boss kills. Routine levels and solo errands are discarded at the
+source. Hooks only assemble
 and enqueue JSON; HTTP, inference, and SQLite remain off the world thread.
 Routine damage, movement, combat ticks, loot spam, and random-bot activity are
 not captured.
