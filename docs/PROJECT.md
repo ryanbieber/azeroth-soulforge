@@ -993,7 +993,9 @@ stores article bodies, retains the prior cache on a refresh failure, and limits
 the configurable source to the supported BBC HTTPS host to avoid an admin-side
 request-forgery primitive. Headline prompts label titles as factual context and
 allow messy fictional opinions while forbidding invented details as news,
-threats, slurs, and celebration of real violence. Fresh world generation now
+new real-world entities absent from the titles, threats, slurs, emoji, and
+celebration of real violence. Current-event lines are framed as WoW analogies.
+Fresh world generation now
 produces concrete owner-editable `roleplay_guidance`, which is used in direct
 dialogue, gameplay reactions, and bounded companion banter.
 On 2026-09-02, 33 Soul Service tests, 13 control-agent tests, Pages validation,

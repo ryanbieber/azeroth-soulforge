@@ -892,9 +892,11 @@ class SoulforgeServer(ThreadingHTTPServer):
                 headline_context = (
                     "\nVerified current headline context (titles only; do not invent extra facts): "
                     + json.dumps(headlines, ensure_ascii=False)
-                    + " React as a messy player with a personal hot take: funny, overconfident, argumentative, "
-                      "or conspiracy-flavored speculation is welcome when clearly opinion. No slurs, threats, "
-                      "or celebration of real violence. Do not present invented details as news.\n"
+                    + " React to the title text only and turn it into a WoW analogy. Do not introduce any real "
+                      "person, group, place, event, motive, or fact that is absent from the supplied titles. "
+                      "A funny, overconfident, argumentative, or conspiracy-flavored personal opinion is welcome, "
+                      "but label speculation as opinion. No slurs, threats, celebration of real violence, or emoji. "
+                      "Never present invented details as news.\n"
                 )
         prompt = (
             f"You are {bot['name']}, an ordinary player on a busy 2004-2009-era World of Warcraft realm. "

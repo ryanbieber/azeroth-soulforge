@@ -270,7 +270,9 @@ class HealthServerTests(unittest.TestCase):
         with patch("soulforge.server.secrets.randbelow", return_value=0):
             self.server._ambient_dialogue(event)
         self.assertIn("First headline", observed["prompt"])
-        self.assertIn("do not invent extra facts", observed["prompt"])
+        self.assertIn("Never present invented details", observed["prompt"])
+        self.assertIn("absent from the supplied titles", observed["prompt"])
+        self.assertIn("turn it into a WoW analogy", observed["prompt"])
         self.assertIn("Ordinary solo quests", observed["prompt"])
 
     def test_mundane_gameplay_events_never_reach_inference(self) -> None:
